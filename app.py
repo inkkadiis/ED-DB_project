@@ -94,9 +94,9 @@ def load_and_filter(file):
     return df.reset_index(drop=True)
 
 # --- [UI 레이아웃] ---
-st.title("🏭 울산 공장 DB 검수 시스템")
+st.title("🏭 공장 DB 검수 시스템")
 
-uploaded_file = st.file_uploader("울산 DB 엑셀 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
+uploaded_file = st.file_uploader("DB 엑셀 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
 if uploaded_file:
     # 새로운 파일이 업로드되면 데이터를 새로고침하도록 로직 추가
@@ -147,7 +147,7 @@ if uploaded_file:
             
             # Flask 서버(localhost:5001)를 통해 지도 로드 - 올바른 origin 제공
             encoded_addr = urllib.parse.quote(search_addr)
-            map_url = f"http://localhost:5001/map?addr={encoded_addr}"
+            map_url = f"https://inkkadiis.github.io/ED-DB_project/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
             
             # iframe으로 Flask 서버의 맵 페이지 로드
             components.iframe(map_url, height=550, scrolling=False)
