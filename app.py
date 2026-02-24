@@ -38,8 +38,8 @@ st.markdown("""
     
     /* 3. 상단 여백(Padding) 확 줄여서 지도를 더 넓게 쓰기 */
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 2.7rem;
+        padding-bottom: 2.7rem;
     }
     
     /* 4. 버튼(PASS/폐업) 디자인 바꾸기 (기본 버튼을 예쁘게) */
@@ -179,8 +179,7 @@ if uploaded_file:
     # 메인 작업창
     left_col, right_col = st.columns([1, 2])
 
-   # 메인 작업창
-    left_col, right_col = st.columns([1, 2])
+   
 
     with left_col:
         st.subheader("검수 리스트")
@@ -238,7 +237,7 @@ if uploaded_file:
             encoded_addr = urllib.parse.quote(search_addr)
             # GitHub Pages 기반 지도 경로
             map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
-            components.iframe(map_url, height=550, scrolling=False)
+            components.iframe(map_url, height=750, scrolling=False)
 
    # --- [다운로드 섹션] ---
     st.divider()
