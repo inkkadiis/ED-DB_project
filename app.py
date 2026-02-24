@@ -132,52 +132,73 @@ if uploaded_file:
             map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
             components.iframe(map_url, height=550, scrolling=False)
 
-    # --- [다운로드 섹션] ---
+   # --- [다운로드 섹션] ---
     st.divider()
     st.subheader("📦 결과 다운로드")
-    d_col1, d_col2 = st.columns(2)
     
-    # 1. 전체 마스터 엑셀 다운로드
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='검수결과완료')
-    excel_data = output.getvalue()
+    # 버튼과 설명을 담을 3개의 구역(컬럼) 생성
+    d_col1, d_col2, d_col3 = st.columns(3)
     
-    d_col1.download_button(
-        label="📂 전체 검수 데이터 다운로드 (Excel)",
-        data=excel_data,
-        file_name="factory_master_result.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    # ---------------------------------------------------------
+    # 1. 데이터 클리닝이 된 파일
+    # ---------------------------------------------------------
+    with d_col1:
+        st.markdown("#### 📄 1. 데이터 클리닝 원본")
+        st.caption("조건(종업원수, 산업코드)에 맞게 필터링되고, 주소 정제(괄호 제거 등)가 완료된 검수 전 전체 원본 데이터입니다.")
+        
+        output1 = io.BytesIO()
+        with pd.ExcelWriter(output1, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='클리닝완료_전체')
+        excel_data1 = output1.getvalue()
+        
+        st.download_button(
+            label="다운로드",
+            data=excel_data1,
+            file_name="1_cleaned_data_master.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
     
-    # 2. 우체국 업로드용 엑셀 다운로드 (PASS 데이터만)
-    post_df = df[df['검수결과'] == "PASS"][['최종주소']]
-    post_df.insert(0, '우편번호', ' ') # 우편번호 공란 혹은 필요시 추가
+    # ---------------------------------------------------------
+    # 2. PASS 된 애들만 모여 있는 파일
+    # ---------------------------------------------------------
+    with d_col2:
+        st.markdown("#### ✅ 2. PASS 완료 목록")
+        st.caption("직접 검수하여 'PASS(가동중)'으로 판정된 공장들만 모아둔 파일입니다. 공장명, 전화번호 등 모든 열이 포함되어 있습니다.")
+        
+        pass_full_df = df[df['검수결과'] == "PASS"]
+        output2 = io.BytesIO()
+        with pd.ExcelWriter(output2, engine='openpyxl') as writer:
+            pass_full_df.to_excel(writer, index=False, sheet_name='PASS_완료')
+        excel_data2 = output2.getvalue()
+        
+        st.download_button(
+            label="다운로드",
+            data=excel_data2,
+            file_name="2_pass_completed_list.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
     
-    output_post = io.BytesIO()
-    with pd.ExcelWriter(output_post, engine='openpyxl') as writer:
-        post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
-    post_excel_data = output_post.getvalue()
-    
-    d_col2.download_button(
-        label="📮 우체국 업로드용 다운로드 (Excel)",
-        data=post_excel_data,
-        file_name="post_upload_list.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    # 2. 우체국 업로드용 엑셀 다운로드 (PASS 데이터만)
-    post_df = df[df['검수결과'] == "PASS"][['최종주소']]
-    post_df.insert(0, '우편번호', ' ') # 우편번호 공란 혹은 필요시 추가
-    
-    output_post = io.BytesIO()
-    with pd.ExcelWriter(output_post, engine='openpyxl') as writer:
-        post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
-    post_excel_data = output_post.getvalue()
-    
-    d_col2.download_button(
-        label="📮 우체국 업로드용 다운로드 (Excel)",
-        data=post_excel_data,
-        file_name="post_upload_list.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    # ---------------------------------------------------------
+    # 3. 우체국용 주소만 있는 파일
+    # ---------------------------------------------------------
+    with d_col3:
+        st.markdown("#### 📮 3. 우체국 업로드용")
+        st.caption("PASS 데이터 중에서 DM 발송을 위해 맨 위 제목 열을 지우고, '우편번호(빈칸)'와 '최종주소' 딱 두 개 열만 남긴 파일입니다.")
+        
+        post_df = pass_full_df[['최종주소']].copy() 
+        post_df.insert(0, '우편번호', ' ') 
+        
+        output3 = io.BytesIO()
+        with pd.ExcelWriter(output3, engine='openpyxl') as writer:
+            post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
+        excel_data3 = output3.getvalue()
+        
+        st.download_button(
+            label="다운로드",
+            data=excel_data3,
+            file_name="3_post_upload_list.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
