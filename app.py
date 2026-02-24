@@ -24,6 +24,39 @@ APPEND_NAME = True       # 주소 뒤에 공장명 붙일지 여부
 
 st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
 
+# 기존 코드
+st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
+
+# 🎨 [디자인 커스텀 영역] CSS 주입
+st.markdown("""
+<style>
+    /* 1. 상단 오른쪽 스트림릿 기본 햄버거 메뉴 숨기기 (깔끔한 사내 툴처럼 보이게) */
+    #MainMenu {visibility: hidden;}
+    
+    /* 2. 맨 아래 'Made with Streamlit' 워터마크 숨기기 */
+    footer {visibility: hidden;}
+    
+    /* 3. 상단 여백(Padding) 확 줄여서 지도를 더 넓게 쓰기 */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 0rem;
+    }
+    
+    /* 4. 버튼(PASS/폐업) 디자인 바꾸기 (기본 버튼을 예쁘게) */
+    .stButton > button {
+        border-radius: 8px; /* 모서리 둥글게 */
+        font-weight: bold;  /* 글씨 굵게 */
+        transition: 0.3s;   /* 마우스 올렸을 때 애니메이션 */
+    }
+    
+    /* 5. 버튼에 마우스 올렸을 때 테두리 색상 변경 */
+    .stButton > button:hover {
+        border-color: #FF4B4B; 
+        color: #FF4B4B;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- [로그인 기능] ---
 if "auth" not in st.session_state:
     st.session_state.auth = False
