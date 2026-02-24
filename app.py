@@ -83,11 +83,18 @@ st.title("🏭 전국 공장 DB 검수 시스템")
 uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
 if uploaded_file:
+    #  추가된 안전장치: history가 아예 없으면 일단 빈 리스트로 만들어 둠
+    if "history" not in st.session_state:
+        st.session_state.history = []
+
+    # 새로운 파일이 업로드되면 데이터를 새로고침하도록 로직 추가
     if "current_file" not in st.session_state or st.session_state.current_file != uploaded_file.name:
         st.session_state.df = load_and_filter(uploaded_file)
         st.session_state.current_file = uploaded_file.name
+        st.session_state.history = [] # 새로운 파일이면 기록 초기화
     
     df = st.session_state.df
+    # ... (아래는 기존과 동일) ...
     
     # 상단 대시보드
     col1, col2, col3 = st.columns(3)
