@@ -27,7 +27,7 @@ st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
 # 기존 코드
 st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
 
-# 🎨 [디자인 커스텀 영역] CSS 주입
+# [디자인 커스텀 영역] CSS 주입
 st.markdown("""
 <style>
     /* 1. 상단 오른쪽 스트림릿 기본 햄버거 메뉴 숨기기 (깔끔한 사내 툴처럼 보이게) */
@@ -62,12 +62,24 @@ if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    pwd = st.text_input("접속 비밀번호를 입력하세요", type="password")
-    if pwd == ACCESS_PASSWORD:
-        st.session_state.auth = True
-        st.rerun()
-    else:
-        st.stop()
+    # 2. 화면을 5:5로 쪼개서 50% 너비만 차지하게 만듭니다.
+    # (만약 가운데 정렬하고 싶다면 st.columns([1, 2, 1]) 하고 with c2: 에 넣으시면 됩니다)
+    login_col1, login_col2 = st.columns([1, 1])
+    
+    with login_col1:
+        st.info("비밀번호를 입력해 주세요.")
+        pwd = st.text_input("접속 비밀번호", type="password")
+        
+        # 비밀번호를 입력했을 때만 검사
+        if pwd:
+            if pwd == ACCESS_PASSWORD:
+                st.session_state.auth = True
+                st.rerun()
+            else:
+                st.error("비밀번호가 일치하지 않습니다. 다시 확인해 주세요.")
+                
+    # 인증 전에는 아래(데이터 로드 등) 로직이 아예 실행되지 않도록 막음
+    st.stop()
 
 # --- [데이터 처리 엔진] ---
 @st.cache_data
@@ -81,7 +93,7 @@ def load_and_filter(file):
     else:
         df = pd.read_csv(file)
         
-    # 3. 🚨 백업 파일 감지기: '검수결과' 컬럼이 있으면 무조건 백업 파일!
+    # 3. 백업 파일 감지기: '검수결과' 컬럼이 있으면 무조건 백업 파일!
     if '검수결과' in df.columns and '최종주소' in df.columns:
         # 정제/필터링 로직을 모두 건너뛰고 기존 작업 상태 그대로 반환
         return df.reset_index(drop=True)
@@ -131,7 +143,7 @@ def load_and_filter(file):
     return df.reset_index(drop=True)
 
 # --- [UI 레이아웃] ---
-st.title("🏭 전국 공장 DB 검수 시스템")
+st.title("전국 공장 DB 검수 시스템")
 
 up_col1, up_col2 = st.columns([1, 1])
 
@@ -178,16 +190,16 @@ if uploaded_file:
             target_row = df.iloc[target_idx]
             
             st.info(f"현재 검수 중: **{target_row['공장명']}**")
-            st.write(f"📍 {target_row['최종주소']}")
+            st.write(f"{target_row['최종주소']}")
             
             # --- [기존 검수 버튼] ---
             c1, c2 = st.columns(2)
             if c1.button("✅ PASS (가동중)", use_container_width=True):
-                st.session_state.history.append(target_idx) # 📝 기록 저장
+                st.session_state.history.append(target_idx) # 기록 저장
                 st.session_state.df.at[target_idx, '검수결과'] = "PASS"
                 st.rerun()
             if c2.button("❌ 폐업/철거/이전", use_container_width=True):
-                st.session_state.history.append(target_idx) # 📝 기록 저장
+                st.session_state.history.append(target_idx) # 기록 저장
                 st.session_state.df.at[target_idx, '검수결과'] = "폐업"
                 st.rerun()
                 
@@ -230,7 +242,7 @@ if uploaded_file:
 
    # --- [다운로드 섹션] ---
     st.divider()
-    st.subheader("📦 결과 다운로드")
+    
     
     # 기존 업로드된 파일명에서 확장자(.xlsx, .csv) 제거 후 순수 이름만 추출
     original_filename = os.path.splitext(st.session_state.current_file)[0]
