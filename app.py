@@ -104,6 +104,9 @@ if uploaded_file:
     # 메인 작업창
     left_col, right_col = st.columns([1, 2])
 
+   # 메인 작업창
+    left_col, right_col = st.columns([1, 2])
+
     with left_col:
         st.subheader("검수 리스트")
         pending_df = df[df['검수결과'] == "미검수"]
@@ -114,13 +117,43 @@ if uploaded_file:
             st.info(f"현재 검수 중: **{target_row['공장명']}**")
             st.write(f"📍 {target_row['최종주소']}")
             
+            # --- [기존 검수 버튼] ---
             c1, c2 = st.columns(2)
             if c1.button("✅ PASS (가동중)", use_container_width=True):
+                st.session_state.history.append(target_idx) # 📝 기록 저장
                 st.session_state.df.at[target_idx, '검수결과'] = "PASS"
                 st.rerun()
             if c2.button("❌ 폐업/철거/이전", use_container_width=True):
+                st.session_state.history.append(target_idx) # 📝 기록 저장
                 st.session_state.df.at[target_idx, '검수결과'] = "폐업"
                 st.rerun()
+                
+            st.write("---")
+            
+            # --- [신규: 뒤로 가기 & 중간 저장 버튼] ---
+            action_c1, action_c2 = st.columns(2)
+            
+            # 1. 뒤로 가기 (history가 비어있으면 버튼 비활성화)
+            if action_c1.button("⏪ 이전 취소 (Undo)", disabled=len(st.session_state.history)==0, use_container_width=True):
+                last_idx = st.session_state.history.pop() # 마지막 작업 꺼내기
+                st.session_state.df.at[last_idx, '검수결과'] = "미검수" # 상태 되돌리기
+                st.rerun()
+                
+            # 2. 중간 저장 (현재 상태 그대로 엑셀 다운로드)
+            output_backup = io.BytesIO()
+            with pd.ExcelWriter(output_backup, engine='openpyxl') as writer:
+                st.session_state.df.to_excel(writer, index=False, sheet_name='중간저장')
+            backup_data = output_backup.getvalue()
+
+            safe_filename = os.path.splitext(st.session_state.current_file)[0]
+            
+            action_c2.download_button(
+                label="💾 진행상황 중간저장",
+                data=backup_data,
+                file_name=f"{safe_filename}_backup.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         else:
             st.success("🎉 모든 검수가 완료되었습니다!")
 
