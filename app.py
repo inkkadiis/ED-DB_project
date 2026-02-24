@@ -54,6 +54,18 @@ st.markdown("""
         border-color: #FF4B4B; 
         color: #FF4B4B;
     }
+            
+    hr {
+        margin-top: 1em !important;
+        margin-bottom: 1em !important;
+    }
+            
+    [data-testid="column"] [data-testid="stVerticalBlock"] {
+        gap: 0.25rem !important;
+    }
+
+    
+   
 </style>
 """, unsafe_allow_html=True)
 
@@ -143,11 +155,12 @@ def load_and_filter(file):
     return df.reset_index(drop=True)
 
 # --- [UI 레이아웃] ---
-st.title("전국 공장 DB 검수 시스템")
 
-up_col1, up_col2 = st.columns([1, 1])
+spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
 
-with up_col1:
+with center_col:
+    # 제목과 업로드 칸을 모두 이 가운데 기둥(center_col) 안에 넣습니다.
+    st.title("전국 공장 DB 검수 시스템")
     uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
 if uploaded_file:
@@ -162,10 +175,11 @@ if uploaded_file:
         st.session_state.history = [] # 새로운 파일이면 기록 초기화
     
     df = st.session_state.df
-    # ... (아래는 기존과 동일) ...
+    
     
     # 상단 대시보드
-    col1, col2, col3 = st.columns(3)
+    dash_spacer_left, col1, col2, col3, dash_spacer_right = st.columns([1.5, 0.8, 0.8, 0.8, 1.5])
+    
     total = len(df)
     done = len(df[df['검수결과'] != "미검수"])
     pass_cnt = len(df[df['검수결과'] == "PASS"])
@@ -204,7 +218,7 @@ if uploaded_file:
                 
             st.write("---")
             
-            # --- [신규: 뒤로 가기 & 중간 저장 버튼] ---
+            # --- [뒤로 가기 & 중간 저장 버튼] ---
             action_c1, action_c2 = st.columns(2)
             
             # 1. 뒤로 가기 (history가 비어있으면 버튼 비활성화)
@@ -237,7 +251,7 @@ if uploaded_file:
             encoded_addr = urllib.parse.quote(search_addr)
             # GitHub Pages 기반 지도 경로
             map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
-            components.iframe(map_url, height=750, scrolling=False)
+            components.iframe(map_url, height=700, scrolling=False)
 
    # --- [다운로드 섹션] ---
     st.divider()
@@ -247,7 +261,7 @@ if uploaded_file:
     original_filename = os.path.splitext(st.session_state.current_file)[0]
     
     # 버튼과 설명을 담을 3개의 구역(컬럼) 생성
-    d_col1, d_col2, d_col3 = st.columns(3)
+    spacer_left, d_col1, d_col2, d_col3, spacer_right = st.columns([1, 1, 1, 1, 1], gap="large")
     
     # ---------------------------------------------------------
     # 1. 데이터 클리닝이 된 파일
