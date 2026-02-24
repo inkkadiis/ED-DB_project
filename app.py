@@ -136,6 +136,9 @@ if uploaded_file:
     st.divider()
     st.subheader("📦 결과 다운로드")
     
+    # 기존 업로드된 파일명에서 확장자(.xlsx, .csv) 제거 후 순수 이름만 추출
+    original_filename = os.path.splitext(st.session_state.current_file)[0]
+    
     # 버튼과 설명을 담을 3개의 구역(컬럼) 생성
     d_col1, d_col2, d_col3 = st.columns(3)
     
@@ -144,17 +147,20 @@ if uploaded_file:
     # ---------------------------------------------------------
     with d_col1:
         st.markdown("#### 📄 1. 데이터 클리닝 원본")
-        st.caption("조건(종업원수, 산업코드)에 맞게 필터링되고, 주소 정제(괄호 제거 등)가 완료된 검수 전 전체 원본 데이터입니다.")
+        st.caption("조건(종업원수, 산업코드)에 맞게 필터링되고, 주소 정제(괄호 제거 등)가 완료된 **검수 전 전체 원본 데이터**입니다.")
+        
+        # 다운로드 전 '검수결과' 컬럼 삭제 (에러 방지를 위해 errors='ignore' 추가)
+        df_download_1 = df.drop(columns=['검수결과'], errors='ignore')
         
         output1 = io.BytesIO()
         with pd.ExcelWriter(output1, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='클리닝완료_전체')
+            df_download_1.to_excel(writer, index=False, sheet_name='클리닝완료_전체')
         excel_data1 = output1.getvalue()
         
         st.download_button(
             label="다운로드",
             data=excel_data1,
-            file_name="1_cleaned_data_master.xlsx",
+            file_name=f"{original_filename}_1_cleaned_data_master.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
@@ -164,18 +170,21 @@ if uploaded_file:
     # ---------------------------------------------------------
     with d_col2:
         st.markdown("#### ✅ 2. PASS 완료 목록")
-        st.caption("직접 검수하여 'PASS(가동중)'으로 판정된 공장들만 모아둔 파일입니다. 공장명, 전화번호 등 모든 열이 포함되어 있습니다.")
+        st.caption("직접 검수하여 **'PASS(가동중)'**으로 판정된 공장들만 모아둔 파일입니다. 공장명, 전화번호 등 모든 열이 포함되어 있습니다.")
         
+        # PASS 데이터만 필터링한 뒤, '검수결과' 컬럼 삭제
         pass_full_df = df[df['검수결과'] == "PASS"]
+        df_download_2 = pass_full_df.drop(columns=['검수결과'], errors='ignore')
+        
         output2 = io.BytesIO()
         with pd.ExcelWriter(output2, engine='openpyxl') as writer:
-            pass_full_df.to_excel(writer, index=False, sheet_name='PASS_완료')
+            df_download_2.to_excel(writer, index=False, sheet_name='PASS_완료')
         excel_data2 = output2.getvalue()
         
         st.download_button(
             label="다운로드",
             data=excel_data2,
-            file_name="2_pass_completed_list.xlsx",
+            file_name=f"{original_filename}_2_pass_completed_list.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
@@ -185,8 +194,9 @@ if uploaded_file:
     # ---------------------------------------------------------
     with d_col3:
         st.markdown("#### 📮 3. 우체국 업로드용")
-        st.caption("PASS 데이터 중에서 DM 발송을 위해 맨 위 제목 열을 지우고, '우편번호(빈칸)'와 '최종주소' 딱 두 개 열만 남긴 파일입니다.")
+        st.caption("PASS 데이터 중에서 DM 발송을 위해 맨 위 제목 열을 지우고, **'우편번호(빈칸)'와 '최종주소'** 딱 두 개 열만 남긴 파일입니다.")
         
+        # 3번 파일은 이미 필요한 컬럼 2개만 뽑아내므로 '검수결과' 삭제가 필요 없음
         post_df = pass_full_df[['최종주소']].copy() 
         post_df.insert(0, '우편번호', ' ') 
         
@@ -198,7 +208,7 @@ if uploaded_file:
         st.download_button(
             label="다운로드",
             data=excel_data3,
-            file_name="3_post_upload_list.xlsx",
+            file_name=f"{original_filename}_3_post_upload_list.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
