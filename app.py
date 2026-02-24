@@ -39,7 +39,7 @@ st.markdown("""
     /* 3. 상단 여백(Padding) 확 줄여서 지도를 더 넓게 쓰기 */
     .block-container {
         padding-top: 2rem;
-        padding-bottom: 0rem;
+        padding-bottom: 2rem;
     }
     
     /* 4. 버튼(PASS/폐업) 디자인 바꾸기 (기본 버튼을 예쁘게) */
@@ -133,7 +133,10 @@ def load_and_filter(file):
 # --- [UI 레이아웃] ---
 st.title("🏭 전국 공장 DB 검수 시스템")
 
-uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
+up_col1, up_col2 = st.columns([1, 1])
+
+with up_col1:
+    uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
 if uploaded_file:
     #  추가된 안전장치: history가 아예 없으면 일단 빈 리스트로 만들어 둠
