@@ -165,3 +165,19 @@ if uploaded_file:
         file_name="post_upload_list.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # 2. 우체국 업로드용 엑셀 다운로드 (PASS 데이터만)
+    post_df = df[df['검수결과'] == "PASS"][['최종주소']]
+    post_df.insert(0, '우편번호', ' ') # 우편번호 공란 혹은 필요시 추가
+    
+    output_post = io.BytesIO()
+    with pd.ExcelWriter(output_post, engine='openpyxl') as writer:
+        post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
+    post_excel_data = output_post.getvalue()
+    
+    d_col2.download_button(
+        label="📮 우체국 업로드용 다운로드 (Excel)",
+        data=post_excel_data,
+        file_name="post_upload_list.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
