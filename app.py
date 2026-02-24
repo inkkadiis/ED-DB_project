@@ -147,7 +147,7 @@ if uploaded_file:
             
             # Flask 서버(localhost:5001)를 통해 지도 로드 - 올바른 origin 제공
             encoded_addr = urllib.parse.quote(search_addr)
-            map_url = f"https://inkkadiis.github.io/ED-DB_project/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
+            map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
             
             # iframe으로 Flask 서버의 맵 페이지 로드
             components.iframe(map_url, height=550, scrolling=False)
