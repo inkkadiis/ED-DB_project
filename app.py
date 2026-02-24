@@ -39,12 +39,31 @@ if not st.session_state.auth:
 # --- [데이터 처리 엔진] ---
 @st.cache_data
 def load_and_filter(file):
-    # 파일 확장자 확인 (엑셀 vs CSV)
+    # 1. 파일 포인터를 맨 앞으로 이동 (스트림릿 안전장치)
+    file.seek(0)
+    
+    # 2. 우선 파일의 첫 줄(header=0)을 기준으로 읽어보기
+    if file.name.endswith('.xlsx'):
+        df = pd.read_excel(file)
+    else:
+        df = pd.read_csv(file)
+        
+    # 3. 🚨 백업 파일 감지기: '검수결과' 컬럼이 있으면 무조건 백업 파일!
+    if '검수결과' in df.columns and '최종주소' in df.columns:
+        # 정제/필터링 로직을 모두 건너뛰고 기존 작업 상태 그대로 반환
+        return df.reset_index(drop=True)
+        
+    # 4. 백업 파일이 아니라면 원본 양식! (header=1로 다시 올바르게 읽기)
+    file.seek(0) # 파일을 다시 읽기 위해 포인터 되감기
     if file.name.endswith('.xlsx'):
         df = pd.read_excel(file, header=1)
     else:
         df = pd.read_csv(file, header=1)
     
+    # 혹시 모를 엑셀 공백 제거
+    df.columns = df.columns.str.strip()
+    
+    # --- 여기서부터는 원본 파일 전용 클리닝 로직 ---
     # 1. 종업원수 및 기업구분 필터링
     df['종업원수'] = pd.to_numeric(df['종업원수'], errors='coerce')
     df = df[(df['종업원수'] >= MIN_EMPLOYEES) & (df['종업원수'] <= MAX_EMPLOYEES)]
@@ -75,6 +94,7 @@ def load_and_filter(file):
     df[['검색용주소', '최종주소']] = df.apply(clean_addr, axis=1)
     df = df.drop_duplicates(subset=['검색용주소'])
     df['검수결과'] = "미검수"
+    
     return df.reset_index(drop=True)
 
 # --- [UI 레이아웃] ---
