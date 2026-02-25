@@ -24,9 +24,6 @@ APPEND_NAME = True       # 주소 뒤에 공장명 붙일지 여부
 
 st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
 
-# 기존 코드
-st.set_page_config(layout="wide", page_title="전국 공장 DB 검수기")
-
 # [디자인 커스텀 영역] CSS 주입
 st.markdown("""
 <style>
@@ -43,14 +40,14 @@ st.markdown("""
     }
     
     /* 4. 버튼(PASS/폐업) 디자인 바꾸기 (기본 버튼을 예쁘게) */
-    .stButton > button {
+    .stButton > button, .stLinkButton > a {
         border-radius: 8px; /* 모서리 둥글게 */
         font-weight: bold;  /* 글씨 굵게 */
         transition: 0.3s;   /* 마우스 올렸을 때 애니메이션 */
     }
     
     /* 5. 버튼에 마우스 올렸을 때 테두리 색상 변경 */
-    .stButton > button:hover {
+    .stButton > button:hover, .stLinkButton > a:hover {
         border-color: #FF4B4B; 
         color: #FF4B4B;
     }
@@ -63,9 +60,6 @@ st.markdown("""
     [data-testid="column"] [data-testid="stVerticalBlock"] {
         gap: 0.25rem !important;
     }
-
-    
-   
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,15 +68,12 @@ if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    # 2. 화면을 5:5로 쪼개서 50% 너비만 차지하게 만듭니다.
-    # (만약 가운데 정렬하고 싶다면 st.columns([1, 2, 1]) 하고 with c2: 에 넣으시면 됩니다)
     login_col1, login_col2 = st.columns([1, 1])
     
     with login_col1:
         st.info("비밀번호를 입력해 주세요.")
         pwd = st.text_input("접속 비밀번호", type="password")
         
-        # 비밀번호를 입력했을 때만 검사
         if pwd:
             if pwd == ACCESS_PASSWORD:
                 st.session_state.auth = True
@@ -90,7 +81,6 @@ if not st.session_state.auth:
             else:
                 st.error("비밀번호가 일치하지 않습니다. 다시 확인해 주세요.")
                 
-    # 인증 전에는 아래(데이터 로드 등) 로직이 아예 실행되지 않도록 막음
     st.stop()
 
 # --- [데이터 처리 엔진] ---
@@ -105,13 +95,14 @@ def load_and_filter(file):
     else:
         df = pd.read_csv(file)
         
-    # 3. 백업 파일 감지기: '검수결과' 컬럼이 있으면 무조건 백업 파일!
-    if '검수결과' in df.columns and '최종주소' in df.columns:
-        # 정제/필터링 로직을 모두 건너뛰고 기존 작업 상태 그대로 반환
+    # 3. 💡 스마트 파일 감지기: 다운로드 받은 파일(열 삭제됨) 재업로드 시 처리
+    if '최종주소' in df.columns:
+        if '검수결과' not in df.columns:
+            df['검수결과'] = "미검수" # 재검수를 위해 미검수로 초기화
         return df.reset_index(drop=True)
         
-    # 4. 백업 파일이 아니라면 원본 양식! (header=1로 다시 올바르게 읽기)
-    file.seek(0) # 파일을 다시 읽기 위해 포인터 되감기
+    # 4. 앱을 거치지 않은 완전 원본 양식이라면! (header=1로 올바르게 다시 읽기)
+    file.seek(0) 
     if file.name.endswith('.xlsx'):
         df = pd.read_excel(file, header=1)
     else:
@@ -159,20 +150,17 @@ def load_and_filter(file):
 spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
 
 with center_col:
-    
     st.title("전국 공장 DB 검수 시스템")
     uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
 if uploaded_file:
-    #  추가된 안전장치: history가 아예 없으면 일단 빈 리스트로 만들어 둠
     if "history" not in st.session_state:
         st.session_state.history = []
 
-    # 새로운 파일이 업로드되면 데이터를 새로고침하도록 로직 추가
     if "current_file" not in st.session_state or st.session_state.current_file != uploaded_file.name:
         st.session_state.df = load_and_filter(uploaded_file)
         st.session_state.current_file = uploaded_file.name
-        st.session_state.history = [] # 새로운 파일이면 기록 초기화
+        st.session_state.history = []
     
     df = st.session_state.df
     
@@ -194,8 +182,6 @@ if uploaded_file:
     # 메인 작업창
     left_col, right_col = st.columns([1, 2])
 
-   
-
     with left_col:
         st.subheader("검수 리스트")
         pending_df = df[df['검수결과'] == "미검수"]
@@ -206,29 +192,36 @@ if uploaded_file:
             st.info(f"현재 검수 중: **{target_row['공장명']}**")
             st.write(f"{target_row['최종주소']}")
             
-            # --- [기존 검수 버튼] ---
-            c1, c2 = st.columns(2)
-            if c1.button("✅ PASS (가동중)", use_container_width=True):
-                st.session_state.history.append(target_idx) # 기록 저장
+            st.write("---")
+            
+            # --- [1. PASS 처리 라인] ---
+            p_col1, p_col2 = st.columns(2)
+            if p_col1.button("✅ PASS (기본)", use_container_width=True):
+                st.session_state.history.append(target_idx)
                 st.session_state.df.at[target_idx, '검수결과'] = "PASS"
                 st.rerun()
-            if c2.button("❌ 폐업/철거/이전", use_container_width=True):
-                st.session_state.history.append(target_idx) # 기록 저장
+                
+            if p_col2.button("✂️ PASS (이름제외)", use_container_width=True):
+                st.session_state.history.append(target_idx)
+                st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
+                st.session_state.df.at[target_idx, '검수결과'] = "PASS"
+                st.rerun()
+                
+            # --- [2. 폐업 및 취소 라인] ---
+            a_col1, a_col2 = st.columns(2)
+            if a_col1.button("❌ 폐업/철거", use_container_width=True):
+                st.session_state.history.append(target_idx)
                 st.session_state.df.at[target_idx, '검수결과'] = "폐업"
+                st.rerun()
+                
+            if a_col2.button("⏪ 이전 취소", disabled=len(st.session_state.history)==0, use_container_width=True):
+                last_idx = st.session_state.history.pop()
+                st.session_state.df.at[last_idx, '검수결과'] = "미검수" 
                 st.rerun()
                 
             st.write("---")
             
-            # --- [뒤로 가기 & 중간 저장 버튼] ---
-            action_c1, action_c2 = st.columns(2)
-            
-            # 1. 뒤로 가기 (history가 비어있으면 버튼 비활성화)
-            if action_c1.button("⏪ 이전 취소 (Undo)", disabled=len(st.session_state.history)==0, use_container_width=True):
-                last_idx = st.session_state.history.pop() # 마지막 작업 꺼내기
-                st.session_state.df.at[last_idx, '검수결과'] = "미검수" # 상태 되돌리기
-                st.rerun()
-                
-            # 2. 중간 저장 (현재 상태 그대로 엑셀 다운로드)
+            # --- [3. 중간 저장 (가로 전체 차지)] ---
             output_backup = io.BytesIO()
             with pd.ExcelWriter(output_backup, engine='openpyxl') as writer:
                 st.session_state.df.to_excel(writer, index=False, sheet_name='중간저장')
@@ -236,13 +229,27 @@ if uploaded_file:
 
             safe_filename = os.path.splitext(st.session_state.current_file)[0]
             
-            action_c2.download_button(
+            st.download_button(
                 label="💾 진행상황 중간저장",
                 data=backup_data,
                 file_name=f"{safe_filename}_backup.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+            
+            # --- [4. 💡 외부 지도 검색 링크 (신규 업데이트 분)] ---
+            st.write("<br>", unsafe_allow_html=True) # 줄바꿈 공백
+            
+            search_addr_encoded = urllib.parse.quote(target_row['검색용주소'])
+            kakao_url = f"https://map.kakao.com/?q={search_addr_encoded}"
+            naver_url = f"https://map.naver.com/p/search/{search_addr_encoded}"
+            
+            link_col1, link_col2 = st.columns(2)
+            with link_col1:
+                st.link_button("🟡 카카오맵 보기", url=kakao_url, use_container_width=True)
+            with link_col2:
+                st.link_button("🟢 네이버맵 보기", url=naver_url, use_container_width=True)
+                
         else:
             st.success("🎉 모든 검수가 완료되었습니다!")
 
@@ -254,24 +261,17 @@ if uploaded_file:
             map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
             components.iframe(map_url, height=700, scrolling=False)
 
-   # --- [다운로드 섹션] ---
+    # --- [다운로드 섹션] ---
     st.divider()
     
-    
-    # 기존 업로드된 파일명에서 확장자(.xlsx, .csv) 제거 후 순수 이름만 추출
     original_filename = os.path.splitext(st.session_state.current_file)[0]
+    spacer_left, d_col1, d_col2, d_col3, d_col4, spacer_right = st.columns([0.5, 1, 1, 1, 1, 0.5], gap="medium")
     
-    # 버튼과 설명을 담을 3개의 구역(컬럼) 생성
-    spacer_left, d_col1, d_col2, d_col3, spacer_right = st.columns([1, 1, 1, 1, 1], gap="large")
-    
-    # ---------------------------------------------------------
     # 1. 데이터 클리닝이 된 파일
-    # ---------------------------------------------------------
     with d_col1:
-        st.markdown("#### 📄 1. 데이터 클리닝 원본")
-        st.caption("조건(종업원수, 산업코드)에 맞게 필터링되고, 주소 정제(괄호 제거 등)가 완료된 **검수 전 전체 원본 데이터**입니다.")
+        st.markdown("#### 📄 1. 클리닝 원본")
+        st.caption("조건에 맞게 필터링되고, 주소 정제가 완료된 **검수 전 전체 원본 데이터**입니다.")
         
-        # 다운로드 전 '검수결과' 컬럼 삭제 (에러 방지를 위해 errors='ignore' 추가)
         df_download_1 = df.drop(columns=['검수결과'], errors='ignore')
         
         output1 = io.BytesIO()
@@ -280,57 +280,89 @@ if uploaded_file:
         excel_data1 = output1.getvalue()
         
         st.download_button(
-            label="다운로드",
+            label=f"다운로드 ({len(df_download_1)}건)",
             data=excel_data1,
             file_name=f"{original_filename}_1_cleaned_data_master.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            use_container_width=True,
+            key="dl_btn_1" 
         )
     
-    # ---------------------------------------------------------
     # 2. PASS 된 애들만 모여 있는 파일
-    # ---------------------------------------------------------
     with d_col2:
-        st.markdown("#### ✅ 2. PASS 완료 목록")
-        st.caption("직접 검수하여 **'PASS(가동중)'**으로 판정된 공장들만 모아둔 파일입니다. 공장명, 전화번호 등 모든 열이 포함되어 있습니다.")
+        st.markdown("#### ✅ 2. PASS 완료")
+        st.caption("직접 검수하여 **'PASS(가동중)'**으로 판정된 공장들만 모아둔 파일입니다.")
         
-        # PASS 데이터만 필터링한 뒤, '검수결과' 컬럼 삭제
-        pass_full_df = df[df['검수결과'] == "PASS"]
-        df_download_2 = pass_full_df.drop(columns=['검수결과'], errors='ignore')
+        pass_full_df = df[df['검수결과'] == "PASS"].copy()
         
-        output2 = io.BytesIO()
-        with pd.ExcelWriter(output2, engine='openpyxl') as writer:
-            df_download_2.to_excel(writer, index=False, sheet_name='PASS_완료')
-        excel_data2 = output2.getvalue()
-        
-        st.download_button(
-            label="다운로드",
-            data=excel_data2,
-            file_name=f"{original_filename}_2_pass_completed_list.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        if pass_full_df.empty:
+            st.info("PASS 처리된 데이터가 없습니다.")
+        else:
+            df_download_2 = pass_full_df.drop(columns=['검수결과'], errors='ignore')
+            
+            output2 = io.BytesIO()
+            with pd.ExcelWriter(output2, engine='openpyxl') as writer:
+                df_download_2.to_excel(writer, index=False, sheet_name='PASS_완료')
+            excel_data2 = output2.getvalue()
+            
+            st.download_button(
+                label=f"다운로드 ({len(df_download_2)}건)",
+                data=excel_data2,
+                file_name=f"{original_filename}_2_pass_list.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="dl_btn_2"
+            )
     
-    # ---------------------------------------------------------
     # 3. 우체국용 주소만 있는 파일
-    # ---------------------------------------------------------
     with d_col3:
-        st.markdown("#### 📮 3. 우체국 업로드용")
-        st.caption("PASS 데이터 중에서 DM 발송을 위해 맨 위 제목 열을 지우고, **'우편번호(빈칸)'와 '최종주소'** 딱 두 개 열만 남긴 파일입니다.")
+        st.markdown("#### 📮 3. 우체국용")
+        st.caption("DM 발송을 위해 **'우편번호(빈칸)'와 '최종주소'** 딱 두 개 열만 남긴 파일입니다.")
         
-        # 3번 파일은 이미 필요한 컬럼 2개만 뽑아내므로 '검수결과' 삭제가 필요 없음
-        post_df = pass_full_df[['최종주소']].copy() 
-        post_df.insert(0, '우편번호', ' ') 
+        pass_full_df = df[df['검수결과'] == "PASS"].copy()
         
-        output3 = io.BytesIO()
-        with pd.ExcelWriter(output3, engine='openpyxl') as writer:
-            post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
-        excel_data3 = output3.getvalue()
+        if pass_full_df.empty:
+            st.info("PASS 처리된 데이터가 없습니다.")
+        else:
+            post_df = pass_full_df[['최종주소']].copy() 
+            post_df.insert(0, '우편번호', ' ') 
+            
+            output3 = io.BytesIO()
+            with pd.ExcelWriter(output3, engine='openpyxl') as writer:
+                post_df.to_excel(writer, index=False, header=False, sheet_name='우체국업로드')
+            excel_data3 = output3.getvalue()
+            
+            st.download_button(
+                label=f"다운로드 ({len(post_df)}건)",
+                data=excel_data3,
+                file_name=f"{original_filename}_3_post_upload.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="dl_btn_3"
+            )
+
+    # 4. ❌ 폐업 및 제외 대상 파일
+    with d_col4:
+        st.markdown("#### ❌ 4. 제외 목록")
+        st.caption("검수 과정에서 **'폐업/철거'** 등으로 판정되어 타겟에서 제외된 공장들만 모아둔 파일입니다.")
         
-        st.download_button(
-            label="다운로드",
-            data=excel_data3,
-            file_name=f"{original_filename}_3_post_upload_list.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        fail_df = df[df['검수결과'] == "폐업"].copy()
+        
+        if fail_df.empty:
+            st.info("제외 처리된 데이터가 없습니다.")
+        else:
+            df_download_4 = fail_df.drop(columns=['검수결과'], errors='ignore')
+            
+            output4 = io.BytesIO()
+            with pd.ExcelWriter(output4, engine='openpyxl') as writer:
+                df_download_4.to_excel(writer, index=False, sheet_name='제외_목록')
+            excel_data4 = output4.getvalue()
+            
+            st.download_button(
+                label=f"다운로드 ({len(df_download_4)}건)",
+                data=excel_data4,
+                file_name=f"{original_filename}_4_excluded_list.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="dl_btn_4"
+            )
