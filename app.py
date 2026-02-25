@@ -159,7 +159,7 @@ def load_and_filter(file):
 spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
 
 with center_col:
-    # 제목과 업로드 칸을 모두 이 가운데 기둥(center_col) 안에 넣습니다.
+    
     st.title("전국 공장 DB 검수 시스템")
     uploaded_file = st.file_uploader("공장 DB 파일을 업로드하세요 (CSV 또는 XLSX)", type=['csv', 'xlsx'])
 
@@ -176,9 +176,10 @@ if uploaded_file:
     
     df = st.session_state.df
     
+    st.divider()
     
     # 상단 대시보드
-    dash_spacer_left, col1, col2, col3, dash_spacer_right = st.columns([1.5, 0.8, 0.8, 0.8, 1.5])
+    col1, col2, col3, dash_spacer_right = st.columns([0.8, 0.8, 0.8, 1.5])
     
     total = len(df)
     done = len(df[df['검수결과'] != "미검수"])
