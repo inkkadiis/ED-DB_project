@@ -91,7 +91,7 @@
                   btnToggle.innerText = "🗺️ 위성지도로 복귀";
                   roadviewClient.getNearestPanoId(
                     position,
-                    50,
+                    20,
                     function (panoId) {
                       if (panoId) roadview.setPanoId(panoId, position);
                       else
@@ -120,4 +120,3 @@
     </script>
   </body>
 </html>
- 

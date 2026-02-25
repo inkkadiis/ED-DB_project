@@ -76,20 +76,36 @@ st.markdown("""
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     
-    /* 구분선 스타일 */
+    /* 구분선 스타일 - 축소 */
     hr {
-        margin-top: 1em !important;
-        margin-bottom: 1em !important;
+        margin-top: 0.3em !important;
+        margin-bottom: 0.3em !important;
     }
     
     /* 컬럼 간격 조정 */
     [data-testid="column"] [data-testid="stVerticalBlock"] {
-        gap: 0.25rem !important;
+        gap: 0.1rem !important;
     }
     
     /* 메트릭 카드 스타일 개선 */
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
+    }
+    
+    /* 헤더 여백 축소 */
+    h5 {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.3rem !important;
+    }
+    
+    /* 버튼 패딩 축소 */
+    .stButton > button {
+        padding: 0.25rem 0.5rem !important;
+    }
+    
+    /* 텍스트 영역 여백 축소 */
+    .stTextArea > div > div {
+        padding: 0.25rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -257,7 +273,11 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
         # 검수결과 초기화
         df['검수결과'] = STATUS_PENDING
         
-        return df.reset_index(drop=True)
+        # 가나다순 정렬 (검색용주소 기준)
+        df = df.sort_values(by='검색용주소').reset_index(drop=True)
+        st.success("✅ 주소 가나다순 정렬 완료")
+        
+        return df
         
     except Exception as e:
         st.error(f"❌ 파일 처리 중 오류가 발생했습니다: {str(e)}")
@@ -324,7 +344,7 @@ if not st.session_state.auth:
 # 헤더
 spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
 with center_col:
-    st.title("🏭 전국 공장 DB 검수 시스템")
+    st.title("전국 공장 DB 검수 시스템")
     uploaded_file = st.file_uploader(
         "공장 DB 파일을 업로드하세요",
         type=['csv', 'xlsx'],
@@ -379,7 +399,7 @@ if uploaded_file:
     left_col, right_col = st.columns([1, 2])
     
     with left_col:
-        st.subheader("📋 검수 리스트")
+        st.subheader("검수 리스트")
         
         pending_df = df[df['검수결과'] == STATUS_PENDING]
         
@@ -389,7 +409,7 @@ if uploaded_file:
             
             # 현재 검수 대상 정보
             remaining = len(pending_df)
-            st.info(f"🏭 **{target_row['공장명']}** (남은 검수: {remaining:,}건)")
+            st.info(f"**{target_row['공장명']}** (남은 검수: {remaining:,}건)")
             st.markdown(f"📍 {target_row['최종주소']}")
             
             # 추가 정보 (있는 경우)
@@ -398,70 +418,107 @@ if uploaded_file:
             
             st.write("---")
             
-            # 검수 버튼
-            st.markdown("##### ✅ 가동중 (PASS)")
-            p_col1, p_col2 = st.columns(2)
+            # 2x2 그리드 레이아웃
+            # 첫 번째 행: PASS (좌) | 검수제외 (우)
+            row1_col1, row1_col2 = st.columns(2)
             
-            if p_col1.button("✅ 기본 주소", use_container_width=True, key="pass_default"):
-                st.session_state.history.append(target_idx)
-                st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
-                st.rerun()
+            with row1_col1:
+                st.markdown("##### PASS")
+                st.caption("업체명과 지도상 업체명이 다르거나 한 주소내에 많은 업체가 있는 경우, 외부지도로 확인 후 이름제외 버튼 활용")
+                
+                if st.button("✅ 기본 주소", use_container_width=True, key="pass_default"):
+                    st.session_state.history.append(target_idx)
+                    st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
+                    st.rerun()
+                
+                if st.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
+                    st.session_state.history.append(target_idx)
+                    st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
+                    st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
+                    st.rerun()
             
-            if p_col2.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
-                st.session_state.history.append(target_idx)
-                st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
-                st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
-                st.rerun()
-            
-            st.markdown("##### ❌ 검수 제외")
-            a_col1, a_col2 = st.columns(2)
-            
-            if a_col1.button("❌ 폐업/철거", use_container_width=True, key="btn_closed"):
-                st.session_state.history.append(target_idx)
-                st.session_state.df.at[target_idx, '검수결과'] = STATUS_CLOSED
-                st.rerun()
-            
-            if a_col2.button("⏪ 이전 취소", 
+            with row1_col2:
+                st.markdown("##### 검수제외")
+                st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
+                st.write("")
+                st.write("")
+                st.write("")  # 빈 공간 추가하여 버튼 위치 맞춤
+                
+                if st.button("❌ 폐업/철거", use_container_width=True, key="btn_closed"):
+                    st.session_state.history.append(target_idx)
+                    st.session_state.df.at[target_idx, '검수결과'] = STATUS_CLOSED
+                    st.rerun()
+                
+                if st.button("⏪ 이전 취소",
                            disabled=len(st.session_state.history) == 0,
                            use_container_width=True,
                            key="btn_undo"):
-                last_idx = st.session_state.history.pop()
-                st.session_state.df.at[last_idx, '검수결과'] = STATUS_PENDING
-                st.rerun()
+                    last_idx = st.session_state.history.pop()
+                    st.session_state.df.at[last_idx, '검수결과'] = STATUS_PENDING
+                    st.rerun()
             
-            st.write("---")
+            # 두 번째 행: 저장 (좌) | 외부지도 (우)
+            row2_col1, row2_col2 = st.columns(2)
             
-            # 중간 저장
-            st.markdown("##### 💾 저장")
-            backup_data = create_excel_download(st.session_state.df, '중간저장')
-            safe_filename = os.path.splitext(st.session_state.current_file)[0]
+            with row2_col1:
+                st.markdown("##### 저장")
+                backup_data = create_excel_download(st.session_state.df, '중간저장')
+                safe_filename = os.path.splitext(st.session_state.current_file)[0]
+                
+                st.download_button(
+                    label="💾 중간저장",
+                    data=backup_data,
+                    file_name=f"{safe_filename}_backup.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="btn_backup"
+                )
             
-            st.download_button(
-                label="💾 진행상황 저장",
-                data=backup_data,
-                file_name=f"{safe_filename}_backup.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="btn_backup"
-            )
-            
-            # 외부 지도 링크
-            st.markdown("##### 🗺️ 외부 지도")
-            search_addr_encoded = urllib.parse.quote(target_row['검색용주소'])
-            
-            link_col1, link_col2 = st.columns(2)
-            with link_col1:
+            with row2_col2:
+                st.markdown("##### 외부지도")
+                search_addr_encoded = urllib.parse.quote(target_row['검색용주소'])
+                
                 st.link_button(
-                    "🟡 카카오맵",
+                    "🟡 카카오",
                     url=f"https://map.kakao.com/?q={search_addr_encoded}",
                     use_container_width=True
                 )
-            with link_col2:
+                
                 st.link_button(
-                    "🟢 네이버맵",
+                    "🟢 네이버",
                     url=f"https://map.naver.com/p/search/{search_addr_encoded}",
                     use_container_width=True
                 )
+            
+            # 주소 수정 섹션
+            st.markdown("##### 주소수정")
+            
+            # 주소 수정 입력란
+            edited_address = st.text_area(
+                "최종주소",
+                value=target_row['최종주소'],
+                height=60,
+                key=f"addr_edit_{target_idx}",
+                label_visibility="collapsed"
+            )
+            
+            # 주소 저장 버튼
+            addr_col1, addr_col2 = st.columns(2)
+            
+            if addr_col1.button("💾 저장", use_container_width=True, key="btn_save_addr"):
+                if edited_address.strip() and edited_address != target_row['최종주소']:
+                    st.session_state.df.at[target_idx, '최종주소'] = edited_address.strip()
+                    st.success("저장완료")
+                    st.rerun()
+                elif not edited_address.strip():
+                    st.error("주소입력 필요")
+                else:
+                    st.info("변경없음")
+            
+            if addr_col2.button("🔄 복구", use_container_width=True, key="btn_reset_addr"):
+                st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소'] + (' ' + target_row['공장명'] if APPEND_NAME else '')
+                st.success("복구완료")
+                st.rerun()
         
         else:
             st.success("🎉 축하합니다! 모든 검수가 완료되었습니다!")
@@ -481,21 +538,21 @@ if uploaded_file:
     # 다운로드 섹션
     # ==========================================
     st.divider()
-    st.subheader("📥 데이터 다운로드")
+    st.subheader("데이터 다운로드")
     
     original_filename = os.path.splitext(st.session_state.current_file)[0]
     d_col1, d_col2, d_col3, d_col4 = st.columns(4, gap="medium")
     
     # 1. 클리닝 원본
     with d_col1:
-        st.markdown("##### 📄 클리닝 원본")
+        st.markdown("##### 클리닝 원본")
         st.caption("필터링 및 정제 완료된 전체 데이터")
         
         df_download_1 = df.drop(columns=['검수결과'], errors='ignore')
         excel_data1 = create_excel_download(df_download_1, '클리닝완료_전체')
         
         st.download_button(
-            label=f"📥 다운로드 ({len(df_download_1):,}건)",
+            label=f"다운로드 ({len(df_download_1):,}건)",
             data=excel_data1,
             file_name=f"{original_filename}_1_cleaned.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -505,7 +562,7 @@ if uploaded_file:
     
     # 2. PASS 목록
     with d_col2:
-        st.markdown("##### ✅ PASS 목록")
+        st.markdown("##### PASS 목록")
         st.caption("검수 완료된 가동중인 공장")
         
         pass_df = df[df['검수결과'] == STATUS_PASS].copy()
@@ -517,7 +574,7 @@ if uploaded_file:
             excel_data2 = create_excel_download(df_download_2, 'PASS_완료')
             
             st.download_button(
-                label=f"📥 다운로드 ({len(df_download_2):,}건)",
+                label=f"다운로드 ({len(df_download_2):,}건)",
                 data=excel_data2,
                 file_name=f"{original_filename}_2_pass.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -527,7 +584,7 @@ if uploaded_file:
     
     # 3. 우체국용
     with d_col3:
-        st.markdown("##### 📮 우체국용")
+        st.markdown("##### 우체국용")
         st.caption("우편번호 + 주소 형식")
         
         pass_df = df[df['검수결과'] == STATUS_PASS].copy()
@@ -541,7 +598,7 @@ if uploaded_file:
             excel_data3 = create_excel_download(post_df, '우체국업로드')
             
             st.download_button(
-                label=f"📥 다운로드 ({len(post_df):,}건)",
+                label=f"다운로드 ({len(post_df):,}건)",
                 data=excel_data3,
                 file_name=f"{original_filename}_3_post.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -551,7 +608,7 @@ if uploaded_file:
     
     # 4. 제외 목록
     with d_col4:
-        st.markdown("##### ❌ 제외 목록")
+        st.markdown("##### 제외 목록")
         st.caption("폐업/철거로 제외된 공장")
         
         closed_df = df[df['검수결과'] == STATUS_CLOSED].copy()
@@ -563,7 +620,7 @@ if uploaded_file:
             excel_data4 = create_excel_download(df_download_4, '제외_목록')
             
             st.download_button(
-                label=f"📥 다운로드 ({len(df_download_4):,}건)",
+                label=f"다운로드 ({len(df_download_4):,}건)",
                 data=excel_data4,
                 file_name=f"{original_filename}_4_excluded.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
