@@ -259,7 +259,7 @@ if uploaded_file:
             encoded_addr = urllib.parse.quote(search_addr)
             # GitHub Pages 기반 지도 경로
             map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
-            components.iframe(map_url, height=700, scrolling=False)
+            components.iframe(map_url, height=800, scrolling=False)
 
     # --- [다운로드 섹션] ---
     st.divider()
