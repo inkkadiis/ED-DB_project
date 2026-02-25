@@ -84,7 +84,7 @@ if not st.session_state.auth:
     st.stop()
 
 # --- [데이터 처리 엔진] ---
-@st.cache_data
+# @st.cache_data
 def load_and_filter(file):
     # 1. 파일 포인터를 맨 앞으로 이동 (스트림릿 안전장치)
     file.seek(0)
@@ -172,6 +172,11 @@ if uploaded_file:
         st.session_state.history = []
     
     df = st.session_state.df
+    
+    # 💡 [신규 안전장치] 만약 클라우드 환경 문제로 df가 날아갔다면 파일 정보를 초기화하고 강제 새로고침!
+    if df is None or not isinstance(df, pd.DataFrame):
+        del st.session_state["current_file"]
+        st.rerun()
     
     st.divider()
     
