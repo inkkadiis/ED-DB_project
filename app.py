@@ -125,25 +125,34 @@ def load_and_filter(file):
     
     df = df[df['업종코드'].apply(check_ind)]
     
-    # 3. 주소 정제 함수
+    # 3. 주소 정제 함수 (스마트 분리 엔진 적용)
     def clean_addr(row):
         addr = str(row['주소'])
         name = str(row['공장명'])
-        clean_a = addr
-        while re.search(r'\([^()]*\)', clean_a):
-            clean_a = re.sub(r'\([^()]*\)', '', clean_a)
-        clean_a = clean_a.replace('(', '').replace(')', '')
-        clean_a = re.sub(r'외\s?\d?필지.*', '', clean_a)
-        clean_a = re.sub(r'외\s?\d?.*', '', clean_a)
-        clean_a = re.sub(r'\s+', ' ', clean_a).strip().rstrip(',')
-        final_a = f"{clean_a} {name}" if APPEND_NAME else clean_a
-        return pd.Series([clean_a, final_a])
-
-    df[['검색용주소', '최종주소']] = df.apply(clean_addr, axis=1)
-    df = df.drop_duplicates(subset=['검색용주소'])
-    df['검수결과'] = "미검수"
-    
-    return df.reset_index(drop=True)
+        
+        # 1단계: 괄호 및 '외 x필지' 등 공통 찌꺼기 제거
+        base_a = addr
+        while re.search(r'\([^()]*\)', base_a):
+            base_a = re.sub(r'\([^()]*\)', '', base_a)
+        base_a = base_a.replace('(', '').replace(')', '')
+        base_a = re.sub(r'외\s?\d?필지.*', '', base_a)
+        base_a = re.sub(r'외\s?\d?.*', '', base_a)
+        
+        # 💡 [신규] 2단계: '검색용'과 '우편물용(최종)' 분리 정제
+        
+        # 검색용: 콤마(,) 뒤에 오는 층/호수 등 잡다한 상세주소를 날려버림 (지도 검색을 위해)
+        clean_search = re.sub(r'[,.\s]*\d+[-~]?\d*호.*', '', base_a) # 404-405호 제거
+        clean_search = re.sub(r'[,.\s]*\d+층.*', '', clean_search)    # 3층 제거
+        clean_search = re.sub(r',\s*\d+.*', '', clean_search)         # 콤마 뒤 숫자 시작부분 제거
+        clean_search = re.sub(r'\s+', ' ', clean_search).strip().rstrip(',')
+        
+        # 최종용: 우체국 배달을 위해 상세주소(호/층)를 그대로 살려둠
+        clean_final = re.sub(r'\s+', ' ', base_a).strip().rstrip(',')
+        
+        # 공장명 붙이기 옵션 적용 (최종 주소에만)
+        final_a = f"{clean_final} {name}" if APPEND_NAME else clean_final
+        
+        return pd.Series([clean_search, final_a])
 
 # --- [UI 레이아웃] ---
 
