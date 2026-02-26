@@ -236,18 +236,24 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
         with st.spinner('📊 데이터 필터링 중...'):
             initial_count = len(df)
             
-            # 1. 종업원수 필터링
+            # 1. 주소 필터링 (주소가 없는 데이터 제거)
+            before_address_filter = len(df)
+            df['주소'] = df['주소'].astype(str).str.strip()
+            df = df[df['주소'].notna() & (df['주소'] != '') & (df['주소'] != 'nan')]
+            after_address_filter = len(df)
+            
+            # 2. 종업원수 필터링
             df['종업원수'] = pd.to_numeric(df['종업원수'], errors='coerce')
             before_employee_filter = len(df)
             df = df[(df['종업원수'] >= MIN_EMPLOYEES) & (df['종업원수'] <= MAX_EMPLOYEES)]
             after_employee_filter = len(df)
             
-            # 2. 기업구분 필터링
+            # 3. 기업구분 필터링
             before_company_filter = len(df)
             df = df[df['기업구분'].str.contains('소기업|중기업', na=False, regex=True)]
             after_company_filter = len(df)
             
-            # 3. 산업코드 필터링
+            # 4. 산업코드 필터링
             before_industry_filter = len(df)
             df = df[df['업종코드'].apply(check_industry_code)]
             filtered_count = len(df)
@@ -256,6 +262,7 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
             st.info(f"""
             **📊 필터링 결과:**
             - 원본 데이터: {initial_count:,}건
+            - 주소 필터링 (주소 있음): {before_address_filter:,}건 → {after_address_filter:,}건 ({before_address_filter - after_address_filter:,}건 제외)
             - 종업원수 필터링 ({MIN_EMPLOYEES}~{MAX_EMPLOYEES}명): {before_employee_filter:,}건 → {after_employee_filter:,}건 ({before_employee_filter - after_employee_filter:,}건 제외)
             - 기업구분 필터링 (소/중기업): {before_company_filter:,}건 → {after_company_filter:,}건 ({before_company_filter - after_company_filter:,}건 제외)
             - 산업코드 필터링 ({INDUSTRY_MIN}~{INDUSTRY_MAX}): {before_industry_filter:,}건 → {filtered_count:,}건 ({before_industry_filter - filtered_count:,}건 제외)
