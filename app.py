@@ -292,12 +292,11 @@ def create_excel_download(df: pd.DataFrame, sheet_name: str = 'Sheet1') -> bytes
     return output.getvalue()
 
 
-def get_progress_stats(df: pd.DataFrame) -> dict:
-    """진행 상황 통계 계산"""
-    total = len(df)
-    done = len(df[df['검수결과'] != STATUS_PENDING])
-    pass_cnt = len(df[df['검수결과'] == STATUS_PASS])
-    closed_cnt = len(df[df['검수결과'] == STATUS_CLOSED])
+@st.cache_data(show_spinner=False)
+def get_progress_stats(df_hash: str, total: int, status_counts: tuple) -> dict:
+    """진행 상황 통계 계산 (캐시 적용)"""
+    pending, pass_cnt, closed_cnt = status_counts
+    done = total - pending
     progress = int(done / total * 100) if total > 0 else 0
     
     return {
@@ -307,6 +306,21 @@ def get_progress_stats(df: pd.DataFrame) -> dict:
         'closed': closed_cnt,
         'progress': progress
     }
+
+
+def compute_stats(df: pd.DataFrame) -> dict:
+    """통계 계산을 위한 래퍼 함수"""
+    total = len(df)
+    status_series = df['검수결과'].value_counts()
+    pending = status_series.get(STATUS_PENDING, 0)
+    pass_cnt = status_series.get(STATUS_PASS, 0)
+    closed_cnt = status_series.get(STATUS_CLOSED, 0)
+    
+    # 캐시 키로 사용할 해시 생성
+    df_hash = f"{total}_{pending}_{pass_cnt}_{closed_cnt}"
+    
+    return get_progress_stats(df_hash, total, (pending, pass_cnt, closed_cnt))
+
 
 
 # ==========================================
@@ -378,9 +392,10 @@ if uploaded_file:
     # ==========================================
     # 대시보드
     # ==========================================
-    stats = get_progress_stats(df)
+    stats = compute_stats(df)
     
     col1, col2, col3, col4, dash_spacer = st.columns([1, 1, 1, 1, 1])
+
     
     col1.metric("📊 전체 타겟", f"{stats['total']:,}건")
     col2.metric("⏳ 검수 진행", f"{stats['done']:,}건", f"{stats['progress']}%")
@@ -424,24 +439,36 @@ if uploaded_file:
             
             with row1_col1:
                 st.markdown("##### PASS")
-                st.caption("업체명과 지도상 업체명이 다르거나 한 주소내에 많은 업체가 있는 경우, 외부지도로 확인 후 이름제외 버튼 활용")
+                st.caption("확인 완료 버튼 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
                 
-                if st.button("✅ 기본 주소", use_container_width=True, key="pass_default"):
+                if st.button("✅ 확인 완료", use_container_width=True, key="pass_default"):
                     st.session_state.history.append(target_idx)
+                    # 현재 최종주소를 가져와서 업체명이 없으면 추가
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 이미 포함되어 있지 않으면 추가
+                    if not current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = f"{current_addr.rstrip()} {factory_name}"
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
                     st.rerun()
                 
                 if st.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
                     st.session_state.history.append(target_idx)
-                    st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
+                    # 현재 최종주소에서 업체명만 제거
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 끝에 있으면 제거
+                    if current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = current_addr[:-len(factory_name)].rstrip()
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
                     st.rerun()
+
             
             with row1_col2:
                 st.markdown("##### 검수제외")
                 st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
                 st.write("")
-                st.write("")
+               
                 st.write("")  # 빈 공간 추가하여 버튼 위치 맞춤
                 
                 if st.button("❌ 폐업/철거", use_container_width=True, key="btn_closed"):
