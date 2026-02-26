@@ -424,23 +424,34 @@ if uploaded_file:
             
             with row1_col1:
                 st.markdown("##### PASS")
-                st.caption("업체명과 지도상 업체명이 다르거나 한 주소내에 많은 업체가 있는 경우, 외부지도로 확인 후 이름제외 버튼 활용")
+                st.caption("확인 완료 버튼 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
                 
-                if st.button("✅ 기본 주소", use_container_width=True, key="pass_default"):
+                if st.button("✅ 확인 완료", use_container_width=True, key="pass_default"):
                     st.session_state.history.append(target_idx)
+                    # 현재 최종주소를 가져와서 업체명이 없으면 추가
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 이미 포함되어 있지 않으면 추가
+                    if not current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = f"{current_addr.rstrip()} {factory_name}"
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
                     st.rerun()
                 
                 if st.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
                     st.session_state.history.append(target_idx)
-                    st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
+                    # 현재 최종주소에서 업체명만 제거
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 끝에 있으면 제거
+                    if current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = current_addr[:-len(factory_name)].rstrip()
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
                     st.rerun()
             
             with row1_col2:
                 st.markdown("##### 검수제외")
                 st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
-                st.write("")
+                
                 st.write("")
                 st.write("")  # 빈 공간 추가하여 버튼 위치 맞춤
                 
