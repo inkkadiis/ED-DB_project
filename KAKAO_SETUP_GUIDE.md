@@ -10,7 +10,7 @@ Kakao Developers 콘솔 (https://developers.kakao.com)에서 다음 도메인을
 
 ### 로컬 개발 환경
 
-- `http://localhost:5001` ⭐ **중요: Flask 서버가 지도를 제공하는 포트입니다!**
+- `http://localhost:5001` **중요: Flask 서버가 지도를 제공하는 포트입니다!**
 
 ### 등록 방법
 

@@ -76,15 +76,16 @@ st.markdown("""
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     
-    /* 구분선 스타일 - 축소 */
+    /* 구분선 스타일 - 섹션 구분 강화 */
     hr {
-        margin-top: 0.3em !important;
-        margin-bottom: 0.3em !important;
+        margin-top: 1.2em !important;
+        margin-bottom: 1.2em !important;
+        border-color: #e0e0e0 !important;
     }
     
     /* 컬럼 간격 조정 */
     [data-testid="column"] [data-testid="stVerticalBlock"] {
-        gap: 0.1rem !important;
+        gap: 0.8rem !important;
     }
     
     /* 메트릭 카드 스타일 개선 */
@@ -117,10 +118,10 @@ st.markdown("""
 def validate_environment() -> bool:
     """환경 변수 검증"""
     if not KAKAO_JS_KEY:
-        st.error("⚠️ KAKAO_JS_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+        st.error("KAKAO_JS_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.")
         return False
     if not ACCESS_PASSWORD:
-        st.error("⚠️ ACCESS_PASSWORD가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+        st.error("ACCESS_PASSWORD가 설정되지 않았습니다. .env 파일을 확인해주세요.")
         return False
     return True
 
@@ -197,13 +198,13 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
             df = pd.read_csv(file, encoding='utf-8-sig')
         
         # 첫 번째 읽기 시도 정보 표시
-        st.info(f"📊 파일 정보: {len(df)}행 x {len(df.columns)}열 감지됨")
+        st.info(f"파일 정보: {len(df)}행 x {len(df.columns)}열 감지됨")
         
         # 데이터프레임 검증
         is_valid, status = validate_dataframe(df)
         
         if not is_valid:
-            st.warning(f"⚠️ 첫 번째 행을 헤더로 읽기 실패. 두 번째 행을 헤더로 재시도합니다...")
+            st.warning(f"첫 번째 행을 헤더로 읽기 실패. 두 번째 행을 헤더로 재시도합니다...")
             
             # 원본 파일 처리 (header=1로 재시도)
             file.seek(0)
@@ -215,25 +216,25 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
             # 컬럼명 정리
             df.columns = df.columns.str.strip()
             
-            st.info(f"📊 재읽기 결과: {len(df)}행 x {len(df.columns)}열")
-            st.info(f"🔍 감지된 컬럼: {', '.join(df.columns.tolist()[:10])}{'...' if len(df.columns) > 10 else ''}")
+            st.info(f"재읽기 결과: {len(df)}행 x {len(df.columns)}열")
+            st.info(f"감지된 컬럼: {', '.join(df.columns.tolist()[:10])}{'...' if len(df.columns) > 10 else ''}")
             
             # 재검증
             is_valid, status = validate_dataframe(df)
             if not is_valid:
-                st.error(f"❌ 파일 검증 실패: {status}")
-                st.error(f"📋 현재 컬럼: {list(df.columns)[:10]}")
+                st.error(f"파일 검증 실패: {status}")
+                st.error(f"현재 컬럼: {list(df.columns)[:10]}")
                 return None
         
         # 이미 처리된 파일인 경우
         if status == "processed":
             if '검수결과' not in df.columns:
                 df['검수결과'] = STATUS_PENDING
-            st.success(f"✅ 이전 작업 파일을 불러왔습니다 ({len(df):,}건)")
+            st.success(f"이전 작업 파일을 불러왔습니다 ({len(df):,}건)")
             return df.reset_index(drop=True)
         
         # 데이터 필터링
-        with st.spinner('📊 데이터 필터링 중...'):
+        with st.spinner('데이터 필터링 중...'):
             initial_count = len(df)
             
             # 1. 주소 필터링 (주소가 없는 데이터 제거)
@@ -260,7 +261,7 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
             
             # 필터링 결과 상세 표시
             st.info(f"""
-            **📊 필터링 결과:**
+            **필터링 결과:**
             - 원본 데이터: {initial_count:,}건
             - 주소 필터링 (주소 있음): {before_address_filter:,}건 → {after_address_filter:,}건 ({before_address_filter - after_address_filter:,}건 제외)
             - 종업원수 필터링 ({MIN_EMPLOYEES}~{MAX_EMPLOYEES}명): {before_employee_filter:,}건 → {after_employee_filter:,}건 ({before_employee_filter - after_employee_filter:,}건 제외)
@@ -270,11 +271,11 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
             """)
             
             if filtered_count == 0:
-                st.error("⚠️ 필터링 조건에 맞는 데이터가 없습니다. 필터링 설정을 확인해주세요.")
+                st.error("필터링 조건에 맞는 데이터가 없습니다. 필터링 설정을 확인해주세요.")
                 return None
         
         # 주소 정제
-        with st.spinner('🏠 주소 정제 중...'):
+        with st.spinner('주소 정제 중...'):
             df[['검색용주소', '최종주소']] = df.apply(clean_address, axis=1)
         
         # 검수결과 초기화
@@ -282,12 +283,12 @@ def load_and_filter(file) -> Optional[pd.DataFrame]:
         
         # 가나다순 정렬 (검색용주소 기준)
         df = df.sort_values(by='검색용주소').reset_index(drop=True)
-        st.success("✅ 주소 가나다순 정렬 완료")
+        st.success("주소 가나다순 정렬 완료")
         
         return df
         
     except Exception as e:
-        st.error(f"❌ 파일 처리 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"파일 처리 중 오류가 발생했습니다: {str(e)}")
         return None
 
 
@@ -337,24 +338,29 @@ def compute_stats(df: pd.DataFrame) -> dict:
 if not validate_environment():
     st.stop()
 
+# 💡 [필수 복구] 이 두 줄이 지워져서 에러가 났었습니다! (초기화)
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    st.markdown("### 🔐 로그인")
-    login_col1, login_col2 = st.columns([1, 1])
+    # 위쪽에 여백을 주어 수직 중앙 정렬 느낌 내기
+    st.write("<br><br><br><br>", unsafe_allow_html=True)
     
-    with login_col1:
+    # 양옆 빈 공간(1)을 두고 가운데(1.5)에 로그인 창 배치
+    spacer1, login_col, spacer2 = st.columns([1, 1.5, 1])
+    
+    with login_col:
+        st.markdown("<h3 style='text-align: center;'>로그인</h3>", unsafe_allow_html=True)
         st.info("비밀번호를 입력해주세요.")
         pwd = st.text_input("접속 비밀번호", type="password", key="login_pwd")
         
         if pwd:
             if pwd == ACCESS_PASSWORD:
                 st.session_state.auth = True
-                st.success("✅ 인증 성공!")
+                st.success("인증 성공!")
                 st.rerun()
             else:
-                st.error("❌ 비밀번호가 일치하지 않습니다.")
+                st.error("비밀번호가 일치하지 않습니다.")
     
     st.stop()
 
@@ -380,7 +386,7 @@ if uploaded_file:
     
     # 새 파일 업로드 시 처리
     if "current_file" not in st.session_state or st.session_state.current_file != uploaded_file.name:
-        with st.spinner('⏳ 파일 처리 중...'):
+        with st.spinner('파일 처리 중...'):
             st.session_state.df = load_and_filter(uploaded_file)
             st.session_state.current_file = uploaded_file.name
             st.session_state.history = []
@@ -391,7 +397,7 @@ if uploaded_file:
     
     # 데이터 유효성 확인
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        st.warning("⚠️ 유효한 데이터가 없습니다. 파일을 다시 업로드해주세요.")
+        st.warning("유효한 데이터가 없습니다. 파일을 다시 업로드해주세요.")
         if "current_file" in st.session_state:
             del st.session_state["current_file"]
         st.stop()
@@ -406,10 +412,10 @@ if uploaded_file:
     col1, col2, col3, col4, dash_spacer = st.columns([1, 1, 1, 1, 1])
 
     
-    col1.metric("📊 전체 타겟", f"{stats['total']:,}건")
-    col2.metric("⏳ 검수 진행", f"{stats['done']:,}건", f"{stats['progress']}%")
-    col3.metric("✅ PASS", f"{stats['pass']:,}건")
-    col4.metric("❌ 폐업", f"{stats['closed']:,}건")
+    col1.metric("전체 타겟", f"{stats['total']:,}건")
+    col2.metric("검수 진행", f"{stats['done']:,}건", f"{stats['progress']}%")
+    col3.metric("PASS", f"{stats['pass']:,}건")
+    col4.metric("폐업", f"{stats['closed']:,}건")
     
     # 진행률 바
     if stats['total'] > 0:
@@ -420,8 +426,8 @@ if uploaded_file:
     # ==========================================
     # 작업 영역
     # ==========================================
-    left_col, right_col = st.columns([1, 2])
-    
+
+    left_col, right_col = st.columns([1, 2], gap="large")
     with left_col:
         st.subheader("검수 리스트")
         
@@ -434,86 +440,74 @@ if uploaded_file:
             # 현재 검수 대상 정보
             remaining = len(pending_df)
             st.info(f"**{target_row['공장명']}** (남은 검수: {remaining:,}건)")
-            st.markdown(f"📍 {target_row['최종주소']}")
+            st.markdown(f"{target_row['최종주소']}")
             
             # 추가 정보 (있는 경우)
             if '종업원수' in target_row:
-                st.caption(f"👥 종업원수: {target_row['종업원수']}명")
+                st.caption(f"종업원수: {target_row['종업원수']}명")
             
             st.write("---")
             
-            # 2x2 그리드 레이아웃
-            # 첫 번째 행: PASS (좌) | 검수제외 (우)
-            row1_col1, row1_col2 = st.columns(2)
-            
-            with row1_col1:
+            # ==========================================
+            # 1. PASS 및 검수제외 라인 (텍스트와 버튼 높이 완벽 정렬)
+            # ==========================================
+            title_col1, title_col2 = st.columns(2)
+            with title_col1:
                 st.markdown("##### PASS")
-                st.caption("확인 완료 버튼 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
-                
-                if st.button("✅ 확인 완료", use_container_width=True, key="pass_default"):
+                st.caption("확인 완료 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
+            with title_col2:
+                st.markdown("##### 검수제외")
+                st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
+            
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.button("확인 완료", use_container_width=True, key="pass_default"):
                     st.session_state.history.append(target_idx)
-                    # 현재 최종주소를 가져와서 업체명이 없으면 추가
                     current_addr = st.session_state.df.at[target_idx, '최종주소']
                     factory_name = target_row['공장명']
-                    # 업체명이 이미 포함되어 있지 않으면 추가
                     if not current_addr.endswith(factory_name):
                         st.session_state.df.at[target_idx, '최종주소'] = f"{current_addr.rstrip()} {factory_name}"
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
-                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
                 
-                if st.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
+                if st.button("이름 제외", use_container_width=True, key="pass_no_name"):
                     st.session_state.history.append(target_idx)
-                    # 현재 최종주소에서 업체명만 제거
                     current_addr = st.session_state.df.at[target_idx, '최종주소']
                     factory_name = target_row['공장명']
-                    # 업체명이 끝에 있으면 제거
                     if current_addr.endswith(factory_name):
                         st.session_state.df.at[target_idx, '최종주소'] = current_addr[:-len(factory_name)].rstrip()
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
-                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
 
-            
-            with row1_col2:
-                st.markdown("##### 검수제외")
-                st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
-                st.write("")
-               
-                st.write("")  # 빈 공간 추가하여 버튼 위치 맞춤
-                
-                if st.button("❌ 폐업/철거", use_container_width=True, key="btn_closed"):
+            with btn_col2:
+                if st.button("폐업/철거", use_container_width=True, key="btn_closed"):
                     st.session_state.history.append(target_idx)
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_CLOSED
-                    st.session_state.df_changed = True  # 변경 플래그 설정
+                    st.session_state.df_changed = True
                     st.rerun()
                 
-                if st.button("⏪ 이전 취소",
-                           disabled=len(st.session_state.history) == 0,
-                           use_container_width=True,
-                           key="btn_undo"):
+                if st.button("이전 취소", disabled=len(st.session_state.history) == 0, use_container_width=True, key="btn_undo"):
                     last_idx = st.session_state.history.pop()
                     st.session_state.df.at[last_idx, '검수결과'] = STATUS_PENDING
-                    st.session_state.df_changed = True  # 변경 플래그 설정
+                    st.session_state.df_changed = True
                     st.rerun()
+
+            st.write("---") # 구역 나누기용 가로선
             
-            # 두 번째 행: 저장 (좌) | 외부지도 (우)
+            # ==========================================
+            # 2. 저장 및 외부지도 라인
+            # ==========================================
             row2_col1, row2_col2 = st.columns(2)
             
             with row2_col1:
                 st.markdown("##### 저장")
-                
-                # 💡 1단계: 준비하기 버튼 (평소에는 이 버튼만 빠릿빠릿하게 보임)
-                if st.button("💾 백업 파일 준비하기", use_container_width=True, key=f"btn_prepare_{target_idx}"):
-                    
-                    # 버튼을 누르면 뺑뺑이가 돌면서 엑셀을 굽기 시작함
+                if st.button("백업 파일 준비하기", use_container_width=True, key=f"btn_prepare_{target_idx}"):
                     with st.spinner("엑셀 파일을 만들고 있습니다..."):
                         backup_data = create_excel_download(st.session_state.df, '중간저장')
                         safe_filename = os.path.splitext(st.session_state.current_file)[0]
                         
-                        # 💡 2단계: 다 구워지면 바로 아래에 진짜 다운로드 버튼이 짠! 하고 나타남
                         st.download_button(
-                            label="📥 준비 완료! (여기를 눌러 다운로드)",
+                            label="준비 완료! (여기를 눌러 다운로드)",
                             data=backup_data,
                             file_name=f"{safe_filename}_backup.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -525,22 +519,19 @@ if uploaded_file:
                 st.markdown("##### 외부지도")
                 search_addr_encoded = urllib.parse.quote(target_row['검색용주소'])
                 
-                st.link_button(
-                    "🟡 카카오",
-                    url=f"https://map.kakao.com/?q={search_addr_encoded}",
-                    use_container_width=True
-                )
-                
-                st.link_button(
-                    "🟢 네이버",
-                    url=f"https://map.naver.com/p/search/{search_addr_encoded}",
-                    use_container_width=True
-                )
+                # 💡 지도 버튼도 가로로 나란히(1:1) 예쁘게 배치합니다.
+                map_col1, map_col2 = st.columns(2)
+                with map_col1:
+                    st.link_button("카카오", url=f"https://map.kakao.com/?q={search_addr_encoded}", use_container_width=True)
+                with map_col2:
+                    st.link_button("네이버", url=f"https://map.naver.com/p/search/{search_addr_encoded}", use_container_width=True)
             
-            # 주소 수정 섹션
+            st.write("---") # 구역 나누기용 가로선
+
+            # ==========================================
+            # 3. 주소 수정 라인
+            # ==========================================
             st.markdown("##### 주소수정")
-            
-            # 주소 수정 입력란
             edited_address = st.text_area(
                 "최종주소",
                 value=target_row['최종주소'],
@@ -549,13 +540,12 @@ if uploaded_file:
                 label_visibility="collapsed"
             )
             
-            # 주소 저장 버튼
             addr_col1, addr_col2 = st.columns(2)
             
-            if addr_col1.button("💾 저장", use_container_width=True, key="btn_save_addr"):
+            if addr_col1.button("저장", use_container_width=True, key="btn_save_addr"):
                 if edited_address.strip() and edited_address != target_row['최종주소']:
                     st.session_state.df.at[target_idx, '최종주소'] = edited_address.strip()
-                    st.session_state.df_changed = True  # 변경 플래그 설정
+                    st.session_state.df_changed = True
                     st.success("저장완료")
                     st.rerun()
                 elif not edited_address.strip():
@@ -563,14 +553,14 @@ if uploaded_file:
                 else:
                     st.info("변경없음")
             
-            if addr_col2.button("🔄 복구", use_container_width=True, key="btn_reset_addr"):
+            if addr_col2.button("복구", use_container_width=True, key="btn_reset_addr"):
                 st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소'] + (' ' + target_row['공장명'] if APPEND_NAME else '')
-                st.session_state.df_changed = True  # 변경 플래그 설정
+                st.session_state.df_changed = True
                 st.success("복구완료")
                 st.rerun()
         
         else:
-            st.success("🎉 축하합니다! 모든 검수가 완료되었습니다!")
+            st.success("축하합니다! 모든 검수가 완료되었습니다!")
             st.balloons()
     
     # 지도 영역
@@ -578,10 +568,10 @@ if uploaded_file:
         if not pending_df.empty:
             search_addr = target_row['검색용주소']
             encoded_addr = urllib.parse.quote(search_addr)
-            map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
-            components.iframe(map_url, height=800, scrolling=False)
+            map_url = f"http://localhost:5001/map?addr={encoded_addr}"
+            components.iframe(map_url, height=900, scrolling=False)
         else:
-            st.info("🗺️ 검수할 항목이 없습니다.")
+            st.info("검수할 항목이 없습니다.")
     
     # ==========================================
     # 다운로드 섹션
@@ -591,10 +581,10 @@ if uploaded_file:
     st.subheader("데이터 다운로드")
     
     # 💡 핵심: 평소에는 숨겨두어 엑셀 변환 로직이 실행되지 않게 막음
-    if st.toggle("🚀 최종 다운로드 패널 열기 (클릭 시 파일 4개 생성)"):
+    if st.toggle("최종 다운로드 패널 열기 (클릭 시 파일 4개 생성)"):
         with st.spinner("다운로드용 엑셀 파일을 굽고 있습니다. 잠시만 기다려주세요..."):
             original_filename = os.path.splitext(st.session_state.current_file)[0]
-            d_col1, d_col2, d_col3, d_col4 = st.columns(4, gap="medium")
+            d_col1, d_col2, d_col3, d_col4 = st.columns(4, gap="large")
             
             # 1. 클리닝 원본
             with d_col1:
@@ -682,29 +672,34 @@ if uploaded_file:
                     )
     else:
         # 패널이 닫혀있을 때 보여줄 메시지
-        st.info("⚡ 검수 작업의 빠른 속도를 위해 다운로드 기능이 대기 중입니다. 파일 저장이 필요할 때 위 스위치를 켜주세요.")
+        st.info("검수 작업의 빠른 속도를 위해 다운로드 기능이 대기 중입니다. 파일 저장이 필요할 때 위 스위치를 켜주세요.")
 
 else:
     # 파일 미업로드 시 안내
-    st.info("👆 파일을 업로드하여 검수를 시작하세요.")
     
-    with st.expander("📖 사용 방법"):
-        st.markdown("""
-        ### 사용 방법
+    # 💡 파일 업로드 창과 똑같이 양옆에 여백(1)을 주고 가운데(2)에만 내용 표시!
+    spacer_left, center_col, spacer_right = st.columns([1, 2, 1])
+    
+    with center_col:
+        st.info("파일을 업로드하여 검수를 시작하세요.")
         
-        1. **파일 업로드**: 공장 DB 파일(CSV 또는 XLSX)을 업로드합니다.
-        2. **자동 필터링**: 설정된 조건에 따라 자동으로 데이터가 필터링됩니다.
-        3. **지도 검수**: 각 공장의 위치를 지도에서 확인하며 검수합니다.
-        4. **검수 처리**: PASS 또는 폐업/철거로 분류합니다.
-        5. **데이터 다운로드**: 검수 완료 후 필요한 형식으로 다운로드합니다.
-        
-        ### 필터링 조건
-        - 종업원수: {MIN_EMPLOYEES}명 ~ {MAX_EMPLOYEES}명
-        - 기업구분: 소기업, 중기업
-        - 산업코드: {INDUSTRY_MIN} ~ {INDUSTRY_MAX}
-        """.format(
-            MIN_EMPLOYEES=MIN_EMPLOYEES,
-            MAX_EMPLOYEES=MAX_EMPLOYEES,
-            INDUSTRY_MIN=INDUSTRY_MIN,
-            INDUSTRY_MAX=INDUSTRY_MAX
-        ))
+        with st.expander("사용 방법"):
+            st.markdown("""
+            ### 사용 방법
+            
+            1. **파일 업로드**: 공장 DB 파일(CSV 또는 XLSX)을 업로드합니다.
+            2. **자동 필터링**: 설정된 조건에 따라 자동으로 데이터가 필터링됩니다.
+            3. **지도 검수**: 각 공장의 위치를 지도에서 확인하며 검수합니다.
+            4. **검수 처리**: PASS 또는 폐업/철거로 분류합니다.
+            5. **데이터 다운로드**: 검수 완료 후 필요한 형식으로 다운로드합니다.
+            
+            ### 필터링 조건
+            - 종업원수: {MIN_EMPLOYEES}명 ~ {MAX_EMPLOYEES}명
+            - 기업구분: 소기업, 중기업
+            - 산업코드: {INDUSTRY_MIN} ~ {INDUSTRY_MAX}
+            """.format(
+                MIN_EMPLOYEES=MIN_EMPLOYEES,
+                MAX_EMPLOYEES=MAX_EMPLOYEES,
+                INDUSTRY_MIN=INDUSTRY_MIN,
+                INDUSTRY_MAX=INDUSTRY_MAX
+            ))
