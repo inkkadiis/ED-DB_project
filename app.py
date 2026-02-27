@@ -299,12 +299,11 @@ def create_excel_download(df: pd.DataFrame, sheet_name: str = 'Sheet1') -> bytes
     return output.getvalue()
 
 
-def get_progress_stats(df: pd.DataFrame) -> dict:
-    """진행 상황 통계 계산"""
-    total = len(df)
-    done = len(df[df['검수결과'] != STATUS_PENDING])
-    pass_cnt = len(df[df['검수결과'] == STATUS_PASS])
-    closed_cnt = len(df[df['검수결과'] == STATUS_CLOSED])
+@st.cache_data(show_spinner=False)
+def get_progress_stats(df_hash: str, total: int, status_counts: tuple) -> dict:
+    """진행 상황 통계 계산 (캐시 적용)"""
+    pending, pass_cnt, closed_cnt = status_counts
+    done = total - pending
     progress = int(done / total * 100) if total > 0 else 0
     
     return {
@@ -314,6 +313,21 @@ def get_progress_stats(df: pd.DataFrame) -> dict:
         'closed': closed_cnt,
         'progress': progress
     }
+
+
+def compute_stats(df: pd.DataFrame) -> dict:
+    """통계 계산을 위한 래퍼 함수"""
+    total = len(df)
+    status_series = df['검수결과'].value_counts()
+    pending = status_series.get(STATUS_PENDING, 0)
+    pass_cnt = status_series.get(STATUS_PASS, 0)
+    closed_cnt = status_series.get(STATUS_CLOSED, 0)
+    
+    # 캐시 키로 사용할 해시 생성
+    df_hash = f"{total}_{pending}_{pass_cnt}_{closed_cnt}"
+    
+    return get_progress_stats(df_hash, total, (pending, pass_cnt, closed_cnt))
+
 
 
 # ==========================================
@@ -370,6 +384,8 @@ if uploaded_file:
             st.session_state.df = load_and_filter(uploaded_file)
             st.session_state.current_file = uploaded_file.name
             st.session_state.history = []
+            st.session_state.df_changed = True  # 새 파일 로드 시 변경 플래그 설정
+
     
     df = st.session_state.df
     
@@ -385,9 +401,10 @@ if uploaded_file:
     # ==========================================
     # 대시보드
     # ==========================================
-    stats = get_progress_stats(df)
+    stats = compute_stats(df)
     
     col1, col2, col3, col4, dash_spacer = st.columns([1, 1, 1, 1, 1])
+
     
     col1.metric("📊 전체 타겟", f"{stats['total']:,}건")
     col2.metric("⏳ 검수 진행", f"{stats['done']:,}건", f"{stats['progress']}%")
@@ -431,29 +448,44 @@ if uploaded_file:
             
             with row1_col1:
                 st.markdown("##### PASS")
-                st.caption("업체명과 지도상 업체명이 다르거나 한 주소내에 많은 업체가 있는 경우, 외부지도로 확인 후 이름제외 버튼 활용")
+                st.caption("확인 완료 버튼 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
                 
-                if st.button("✅ 기본 주소", use_container_width=True, key="pass_default"):
+                if st.button("✅ 확인 완료", use_container_width=True, key="pass_default"):
                     st.session_state.history.append(target_idx)
+                    # 현재 최종주소를 가져와서 업체명이 없으면 추가
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 이미 포함되어 있지 않으면 추가
+                    if not current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = f"{current_addr.rstrip()} {factory_name}"
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
+                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
                 
                 if st.button("✂️ 이름 제외", use_container_width=True, key="pass_no_name"):
                     st.session_state.history.append(target_idx)
-                    st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소']
+                    # 현재 최종주소에서 업체명만 제거
+                    current_addr = st.session_state.df.at[target_idx, '최종주소']
+                    factory_name = target_row['공장명']
+                    # 업체명이 끝에 있으면 제거
+                    if current_addr.endswith(factory_name):
+                        st.session_state.df.at[target_idx, '최종주소'] = current_addr[:-len(factory_name)].rstrip()
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
+                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
+
             
             with row1_col2:
                 st.markdown("##### 검수제외")
                 st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
                 st.write("")
-                st.write("")
+               
                 st.write("")  # 빈 공간 추가하여 버튼 위치 맞춤
                 
                 if st.button("❌ 폐업/철거", use_container_width=True, key="btn_closed"):
                     st.session_state.history.append(target_idx)
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_CLOSED
+                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
                 
                 if st.button("⏪ 이전 취소",
@@ -462,6 +494,7 @@ if uploaded_file:
                            key="btn_undo"):
                     last_idx = st.session_state.history.pop()
                     st.session_state.df.at[last_idx, '검수결과'] = STATUS_PENDING
+                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.rerun()
             
             # 두 번째 행: 저장 (좌) | 외부지도 (우)
@@ -469,17 +502,20 @@ if uploaded_file:
             
             with row2_col1:
                 st.markdown("##### 저장")
-                backup_data = create_excel_download(st.session_state.df, '중간저장')
-                safe_filename = os.path.splitext(st.session_state.current_file)[0]
-                
-                st.download_button(
-                    label="💾 중간저장",
-                    data=backup_data,
-                    file_name=f"{safe_filename}_backup.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                    key="btn_backup"
-                )
+                # 💡 스위치(토글)를 켤 때만 엑셀 파일을 생성하도록 지연시킴
+                if st.toggle("💾 백업 파일 만들기", key=f"toggle_backup_{target_idx}"):
+                    with st.spinner("엑셀 파일 생성 중..."):
+                        backup_data = create_excel_download(st.session_state.df, '중간저장')
+                        safe_filename = os.path.splitext(st.session_state.current_file)[0]
+                        
+                        st.download_button(
+                            label="📥 중간저장 다운로드",
+                            data=backup_data,
+                            file_name=f"{safe_filename}_backup.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                            key="btn_backup"
+                        )
             
             with row2_col2:
                 st.markdown("##### 외부지도")
@@ -515,6 +551,7 @@ if uploaded_file:
             if addr_col1.button("💾 저장", use_container_width=True, key="btn_save_addr"):
                 if edited_address.strip() and edited_address != target_row['최종주소']:
                     st.session_state.df.at[target_idx, '최종주소'] = edited_address.strip()
+                    st.session_state.df_changed = True  # 변경 플래그 설정
                     st.success("저장완료")
                     st.rerun()
                 elif not edited_address.strip():
@@ -524,6 +561,7 @@ if uploaded_file:
             
             if addr_col2.button("🔄 복구", use_container_width=True, key="btn_reset_addr"):
                 st.session_state.df.at[target_idx, '최종주소'] = target_row['검색용주소'] + (' ' + target_row['공장명'] if APPEND_NAME else '')
+                st.session_state.df_changed = True  # 변경 플래그 설정
                 st.success("복구완료")
                 st.rerun()
         
@@ -544,96 +582,103 @@ if uploaded_file:
     # ==========================================
     # 다운로드 섹션
     # ==========================================
+  
     st.divider()
     st.subheader("데이터 다운로드")
     
-    original_filename = os.path.splitext(st.session_state.current_file)[0]
-    d_col1, d_col2, d_col3, d_col4 = st.columns(4, gap="medium")
-    
-    # 1. 클리닝 원본
-    with d_col1:
-        st.markdown("##### 클리닝 원본")
-        st.caption("필터링 및 정제 완료된 전체 데이터")
-        
-        df_download_1 = df.drop(columns=['검수결과'], errors='ignore')
-        excel_data1 = create_excel_download(df_download_1, '클리닝완료_전체')
-        
-        st.download_button(
-            label=f"다운로드 ({len(df_download_1):,}건)",
-            data=excel_data1,
-            file_name=f"{original_filename}_1_cleaned.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="dl_btn_1"
-        )
-    
-    # 2. PASS 목록
-    with d_col2:
-        st.markdown("##### PASS 목록")
-        st.caption("검수 완료된 가동중인 공장")
-        
-        pass_df = df[df['검수결과'] == STATUS_PASS].copy()
-        
-        if pass_df.empty:
-            st.info("데이터 없음")
-        else:
-            df_download_2 = pass_df.drop(columns=['검수결과'], errors='ignore')
-            excel_data2 = create_excel_download(df_download_2, 'PASS_완료')
+    # 💡 핵심: 평소에는 숨겨두어 엑셀 변환 로직이 실행되지 않게 막음
+    if st.toggle("🚀 최종 다운로드 패널 열기 (클릭 시 파일 4개 생성)"):
+        with st.spinner("다운로드용 엑셀 파일을 굽고 있습니다. 잠시만 기다려주세요..."):
+            original_filename = os.path.splitext(st.session_state.current_file)[0]
+            d_col1, d_col2, d_col3, d_col4 = st.columns(4, gap="medium")
             
-            st.download_button(
-                label=f"다운로드 ({len(df_download_2):,}건)",
-                data=excel_data2,
-                file_name=f"{original_filename}_2_pass.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="dl_btn_2"
-            )
-    
-    # 3. 우체국용
-    with d_col3:
-        st.markdown("##### 우체국용")
-        st.caption("우편번호 + 주소 형식")
-        
-        pass_df = df[df['검수결과'] == STATUS_PASS].copy()
-        
-        if pass_df.empty:
-            st.info("데이터 없음")
-        else:
-            post_df = pass_df[['최종주소']].copy()
-            post_df.insert(0, '우편번호', ' ')
+            # 1. 클리닝 원본
+            with d_col1:
+                st.markdown("##### 클리닝 원본")
+                st.caption("필터링 및 정제 완료된 전체 데이터")
+                
+                df_download_1 = df.drop(columns=['검수결과'], errors='ignore')
+                excel_data1 = create_excel_download(df_download_1, '클리닝완료_전체')
+                
+                st.download_button(
+                    label=f"다운로드 ({len(df_download_1):,}건)",
+                    data=excel_data1,
+                    file_name=f"{original_filename}_1_cleaned.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="dl_btn_1"
+                )
             
-            excel_data3 = create_excel_download(post_df, '우체국업로드')
+            # 2. PASS 목록
+            with d_col2:
+                st.markdown("##### PASS 목록")
+                st.caption("검수 완료된 가동중인 공장")
+                
+                pass_df = df[df['검수결과'] == STATUS_PASS].copy()
+                
+                if pass_df.empty:
+                    st.info("데이터 없음")
+                else:
+                    df_download_2 = pass_df.drop(columns=['검수결과'], errors='ignore')
+                    excel_data2 = create_excel_download(df_download_2, 'PASS_완료')
+                    
+                    st.download_button(
+                        label=f"다운로드 ({len(df_download_2):,}건)",
+                        data=excel_data2,
+                        file_name=f"{original_filename}_2_pass.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="dl_btn_2"
+                    )
             
-            st.download_button(
-                label=f"다운로드 ({len(post_df):,}건)",
-                data=excel_data3,
-                file_name=f"{original_filename}_3_post.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="dl_btn_3"
-            )
-    
-    # 4. 제외 목록
-    with d_col4:
-        st.markdown("##### 제외 목록")
-        st.caption("폐업/철거로 제외된 공장")
-        
-        closed_df = df[df['검수결과'] == STATUS_CLOSED].copy()
-        
-        if closed_df.empty:
-            st.info("데이터 없음")
-        else:
-            df_download_4 = closed_df.drop(columns=['검수결과'], errors='ignore')
-            excel_data4 = create_excel_download(df_download_4, '제외_목록')
+            # 3. 우체국용
+            with d_col3:
+                st.markdown("##### 우체국용")
+                st.caption("우편번호 + 주소 형식")
+                
+                pass_df = df[df['검수결과'] == STATUS_PASS].copy()
+                
+                if pass_df.empty:
+                    st.info("데이터 없음")
+                else:
+                    post_df = pass_df[['최종주소']].copy()
+                    post_df.insert(0, '우편번호', ' ')
+                    
+                    excel_data3 = create_excel_download(post_df, '우체국업로드')
+                    
+                    st.download_button(
+                        label=f"다운로드 ({len(post_df):,}건)",
+                        data=excel_data3,
+                        file_name=f"{original_filename}_3_post.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="dl_btn_3"
+                    )
             
-            st.download_button(
-                label=f"다운로드 ({len(df_download_4):,}건)",
-                data=excel_data4,
-                file_name=f"{original_filename}_4_excluded.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="dl_btn_4"
-            )
+            # 4. 제외 목록
+            with d_col4:
+                st.markdown("##### 제외 목록")
+                st.caption("폐업/철거로 제외된 공장")
+                
+                closed_df = df[df['검수결과'] == STATUS_CLOSED].copy()
+                
+                if closed_df.empty:
+                    st.info("데이터 없음")
+                else:
+                    df_download_4 = closed_df.drop(columns=['검수결과'], errors='ignore')
+                    excel_data4 = create_excel_download(df_download_4, '제외_목록')
+                    
+                    st.download_button(
+                        label=f"다운로드 ({len(df_download_4):,}건)",
+                        data=excel_data4,
+                        file_name=f"{original_filename}_4_excluded.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="dl_btn_4"
+                    )
+    else:
+        # 패널이 닫혀있을 때 보여줄 메시지
+        st.info("⚡ 검수 작업의 빠른 속도를 위해 다운로드 기능이 대기 중입니다. 파일 저장이 필요할 때 위 스위치를 켜주세요.")
 
 else:
     # 파일 미업로드 시 안내
