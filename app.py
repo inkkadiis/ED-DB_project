@@ -502,19 +502,23 @@ if uploaded_file:
             
             with row2_col1:
                 st.markdown("##### 저장")
-                # 💡 스위치(토글)를 켤 때만 엑셀 파일을 생성하도록 지연시킴
-                if st.toggle("💾 백업 파일 만들기", key=f"toggle_backup_{target_idx}"):
-                    with st.spinner("엑셀 파일 생성 중..."):
+                
+                # 💡 1단계: 준비하기 버튼 (평소에는 이 버튼만 빠릿빠릿하게 보임)
+                if st.button("💾 백업 파일 준비하기", use_container_width=True, key=f"btn_prepare_{target_idx}"):
+                    
+                    # 버튼을 누르면 뺑뺑이가 돌면서 엑셀을 굽기 시작함
+                    with st.spinner("엑셀 파일을 만들고 있습니다..."):
                         backup_data = create_excel_download(st.session_state.df, '중간저장')
                         safe_filename = os.path.splitext(st.session_state.current_file)[0]
                         
+                        # 💡 2단계: 다 구워지면 바로 아래에 진짜 다운로드 버튼이 짠! 하고 나타남
                         st.download_button(
-                            label="📥 중간저장 다운로드",
+                            label="📥 준비 완료! (여기를 눌러 다운로드)",
                             data=backup_data,
                             file_name=f"{safe_filename}_backup.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             use_container_width=True,
-                            key="btn_backup"
+                            key=f"btn_dl_{target_idx}"
                         )
             
             with row2_col2:
