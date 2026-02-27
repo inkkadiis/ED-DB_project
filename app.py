@@ -500,7 +500,7 @@ if uploaded_file:
             row2_col1, row2_col2 = st.columns(2)
             
             with row2_col1:
-                st.markdown("##### 저장")
+                st.markdown("##### 임시 저장")
                 if st.button("백업 파일 준비하기", use_container_width=True, key=f"btn_prepare_{target_idx}"):
                     with st.spinner("엑셀 파일을 만들고 있습니다..."):
                         backup_data = create_excel_download(st.session_state.df, '중간저장')
