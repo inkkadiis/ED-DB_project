@@ -568,7 +568,7 @@ if uploaded_file:
         if not pending_df.empty:
             search_addr = target_row['검색용주소']
             encoded_addr = urllib.parse.quote(search_addr)
-            map_url = f"http://localhost:5001/map?addr={encoded_addr}"
+            map_url = f"https://inkkadiis.github.io/ED-DB_project/static/map.html?addr={encoded_addr}&key={KAKAO_JS_KEY}"
             components.iframe(map_url, height=900, scrolling=False)
         else:
             st.info("검수할 항목이 없습니다.")
