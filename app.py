@@ -454,7 +454,7 @@ if uploaded_file:
             title_col1, title_col2 = st.columns(2)
             with title_col1:
                 st.markdown("##### PASS")
-                st.caption("확인 완료 누를 시 주소+업체명, 이름 제외 누를 시 주소만")
+                st.caption("확인 완료 누를 시 주소+업체명, 업체명 제외 누를 시 주소만")
             with title_col2:
                 st.markdown("##### 검수제외")
                 st.caption("폐업/철거 클릭 후 추후에 재차 확인 가능")
@@ -470,7 +470,7 @@ if uploaded_file:
                     st.session_state.df.at[target_idx, '검수결과'] = STATUS_PASS
                     st.rerun()
                 
-                if st.button("이름 제외", use_container_width=True, key="pass_no_name"):
+                if st.button("업체명 제외", use_container_width=True, key="pass_no_name"):
                     st.session_state.history.append(target_idx)
                     current_addr = st.session_state.df.at[target_idx, '최종주소']
                     factory_name = target_row['공장명']
@@ -507,7 +507,7 @@ if uploaded_file:
                         safe_filename = os.path.splitext(st.session_state.current_file)[0]
                         
                         st.download_button(
-                            label="준비 완료! (여기를 눌러 다운로드)",
+                            label="다운로드",
                             data=backup_data,
                             file_name=f"{safe_filename}_backup.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -532,6 +532,7 @@ if uploaded_file:
             # 3. 주소 수정 라인
             # ==========================================
             st.markdown("##### 주소수정")
+            st.caption("새로운 주소로 우편용 주소가 변경")
             edited_address = st.text_area(
                 "최종주소",
                 value=target_row['최종주소'],
@@ -630,7 +631,7 @@ if uploaded_file:
     # 3. 우체국용
     with d_col3:
         st.markdown("##### 우체국용")
-        st.caption("우편번호 + 주소 형식")
+        st.caption("주소 형식")
         
         if st.button("파일 생성하기", key="btn_prep_3", use_container_width=True):
             with st.spinner("엑셀 생성 중..."):
@@ -639,7 +640,7 @@ if uploaded_file:
                     st.error("PASS 처리된 데이터가 없습니다.")
                 else:
                     post_df = pass_df[['최종주소']].copy()
-                    post_df.insert(0, '우편번호', ' ')
+                    
                     excel_data3 = create_excel_download(post_df, '우체국업로드')
                     
                     st.download_button(
